@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: salope-config
+  namespace: salope
+data:
+  ALLOWED_EMAIL_DOMAIN: "lateb.eu"
+  CORS_ORIGINS: "https://planning.lateb.eu"
+  FUZZY_MATCH_THRESHOLD: "90"
+  DATABASE_URL: "postgresql://baruser:$(POSTGRES_PASSWORD)@salope-postgres:5432/salope"
