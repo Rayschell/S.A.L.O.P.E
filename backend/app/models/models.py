@@ -8,7 +8,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum,
-    Float,
     ForeignKey,
     Integer,
     String,
@@ -64,9 +63,7 @@ class Member(Base):
     prenom = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String, nullable=True)
-    # PostgreSQL ARRAY of text — stores ["staff"], ["bureau"], ["staff","bureau"]
     roles = Column(ARRAY(String), nullable=False, default=list)
-    heures_cumulees = Column(Float, nullable=False, default=0.0)
     shifts_respo_bar_cumules = Column(Integer, nullable=False, default=0)
 
     aliases = relationship(
@@ -74,6 +71,9 @@ class Member(Base):
     )
     availabilities = relationship("Availability", back_populates="member")
     assignments = relationship("Assignment", back_populates="member")
+    stats = relationship(
+        "StatsMemberHeureRelative", back_populates="member", cascade="all, delete-orphan"
+    )
 
 
 class MemberAlias(Base):
@@ -126,6 +126,7 @@ class Slot(Base):
     )
     heure_debut = Column(DateTime, nullable=False)
     heure_fin = Column(DateTime, nullable=False)
+    heure_relative = Column(Integer, nullable=False, default=0)
     max_personnes = Column(Integer, nullable=False, default=3)
 
     event = relationship("Event", back_populates="slots")
@@ -237,5 +238,29 @@ class AffinityConstraint(Base):
     __table_args__ = (
         UniqueConstraint(
             "evenement_id", "membre_a_id", "membre_b_id", name="uq_affinity"
+        ),
+    )
+
+
+class StatsMemberHeureRelative(Base):
+    """Per-member, per-event-type, per-relative-hour statistics."""
+
+    __tablename__ = "stats_member_heure_relative"
+
+    id = Column(Integer, primary_key=True, index=True)
+    membre_id = Column(
+        Integer, ForeignKey("members.id", ondelete="CASCADE"), nullable=False
+    )
+    type_evenement = Column(Enum(EventTypeEnum), nullable=False)
+    heure_relative = Column(Integer, nullable=False)
+    fois_disponible = Column(Integer, nullable=False, default=0)
+    fois_staffe = Column(Integer, nullable=False, default=0)
+
+    member = relationship("Member", back_populates="stats")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "membre_id", "type_evenement", "heure_relative",
+            name="uq_stats_member_heure",
         ),
     )

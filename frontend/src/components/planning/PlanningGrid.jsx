@@ -20,6 +20,7 @@ export default function PlanningGrid({
 }) {
   const [editCell, setEditCell] = useState(null) // {memberId, slotId}
   const [cellLoading, setCellLoading] = useState(null)
+  const [cellError, setCellError] = useState(null) // {memberId, slotId, message}
 
   // Build quick lookup maps
   const asgMap = {} // key = `${memberId}-${slotId}` -> assignment
@@ -68,6 +69,7 @@ export default function PlanningGrid({
   const handleAssign = async (memberId, slotId, type) => {
     const key = `${memberId}-${slotId}`
     setCellLoading(key)
+    setCellError(null)
     try {
       if (type === 'none') {
         const existing = asgMap[key]
@@ -88,6 +90,9 @@ export default function PlanningGrid({
       }
       const fresh = await eventsApi.listAssignments(eventId)
       onAssignmentChange(fresh)
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Erreur lors de l\'affectation'
+      setCellError({ memberId, slotId, message: msg })
     } finally {
       setCellLoading(null)
       setEditCell(null)
@@ -208,6 +213,12 @@ export default function PlanningGrid({
                         >
                           Annuler
                         </button>
+                      </div>
+                    )}
+                    {/* Inline error for this cell */}
+                    {cellError?.memberId === member.id && cellError?.slotId === slot.id && (
+                      <div className="absolute z-40 left-0 top-full mt-1 bg-red-50 border border-red-300 rounded px-2 py-1 text-xs text-red-700 whitespace-nowrap shadow">
+                        {cellError.message}
                       </div>
                     )}
                   </td>

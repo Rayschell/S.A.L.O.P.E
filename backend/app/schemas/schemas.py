@@ -45,7 +45,6 @@ class MemberBase(BaseModel):
     prenom: str
     email: Optional[EmailStr] = None
     roles: List[str] = ["staff"]
-    heures_cumulees: float = 0.0
     shifts_respo_bar_cumules: int = 0
 
     @field_validator("roles")
@@ -67,7 +66,6 @@ class MemberUpdate(BaseModel):
     prenom: Optional[str] = None
     email: Optional[EmailStr] = None
     roles: Optional[List[str]] = None
-    heures_cumulees: Optional[float] = None
     shifts_respo_bar_cumules: Optional[int] = None
     password: Optional[str] = None
 
@@ -123,6 +121,7 @@ class SlotRead(BaseModel):
     evenement_id: int
     heure_debut: datetime
     heure_fin: datetime
+    heure_relative: int
     max_personnes: int
 
     model_config = {"from_attributes": True}
@@ -300,3 +299,21 @@ class WarningItem(BaseModel):
 class GenerateResponse(BaseModel):
     warnings: List[WarningItem]
     assignments: List[AssignmentRead]
+
+
+# ---------------------------------------------------------------------------
+# Member stats
+# ---------------------------------------------------------------------------
+
+
+class MemberStatsEntry(BaseModel):
+    heure_relative: int
+    fois_disponible: int
+    fois_staffe: int
+
+    model_config = {"from_attributes": True}
+
+
+class MemberStatsRead(BaseModel):
+    afterwork: List[MemberStatsEntry] = []
+    soiree: List[MemberStatsEntry] = []

@@ -10,7 +10,6 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
     nom: initial?.nom || '',
     email: initial?.email || '',
     roles: initial?.roles || ['staff'],
-    heures_cumulees: initial?.heures_cumulees ?? 0,
     shifts_respo_bar_cumules: initial?.shifts_respo_bar_cumules ?? 0,
     password: '',
   })
@@ -39,7 +38,6 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
       const payload = { ...form }
       if (!payload.password) delete payload.password
       if (!payload.email) delete payload.email
-      if (isNaN(payload.heures_cumulees)) payload.heures_cumulees = 0
       if (isNaN(payload.shifts_respo_bar_cumules)) payload.shifts_respo_bar_cumules = 0
       if (isEdit) {
         await membersApi.update(initial.id, payload)
@@ -128,30 +126,16 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Heures cumulées</label>
-          <input
-            type="number"
-            step="0.5"
-            min="0"
-            value={form.heures_cumulees}
-            onChange={(e) => setForm({ ...form, heures_cumulees: parseFloat(e.target.value) })}
-            className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Shifts respo bar</label>
-          <input
-            type="number"
-            min="0"
-            value={form.shifts_respo_bar_cumules}
-            onChange={(e) =>
-              setForm({ ...form, shifts_respo_bar_cumules: parseInt(e.target.value, 10) })
-            }
-            className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+      
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Shifts respo bar</label>
+        <input
+          type="number" min="0"
+          value={form.shifts_respo_bar_cumules}
+          onChange={(e) => setForm({ ...form, shifts_respo_bar_cumules: parseInt(e.target.value, 10) })}
+          className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
       </div>
 
       {error && (

@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from ..core.deps import get_db, get_current_member, require_bureau
 from ..core.security import hash_password
-from ..models.models import Member, MemberAlias
-from ..schemas.schemas import MemberCreate, MemberRead, MemberReadFull, MemberUpdate
+from ..models.models import EventTypeEnum, Member, MemberAlias, StatsMemberHeureRelative
+from ..schemas.schemas import (
+    MemberCreate, MemberRead, MemberReadFull, MemberStatsRead, MemberStatsEntry, MemberUpdate
+)
 
 router = APIRouter(prefix="/api/members", tags=["members"])
 
@@ -49,7 +51,6 @@ def create_member(
         prenom=payload.prenom,
         email=payload.email,
         roles=payload.roles,
-        heures_cumulees=payload.heures_cumulees,
         shifts_respo_bar_cumules=payload.shifts_respo_bar_cumules,
         hashed_password=hash_password(payload.password) if payload.password else None,
     )
@@ -77,8 +78,6 @@ def update_member(
         member.email = payload.email
     if payload.roles is not None:
         member.roles = payload.roles
-    if payload.heures_cumulees is not None:
-        member.heures_cumulees = payload.heures_cumulees
     if payload.shifts_respo_bar_cumules is not None:
         member.shifts_respo_bar_cumules = payload.shifts_respo_bar_cumules
     if payload.password is not None:
@@ -110,8 +109,10 @@ def reset_counters(
     member = db.query(Member).filter(Member.id == member_id).first()
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
-    member.heures_cumulees = 0.0
     member.shifts_respo_bar_cumules = 0
+    db.query(StatsMemberHeureRelative).filter(
+        StatsMemberHeureRelative.membre_id == member_id
+    ).update({"fois_staffe": 0, "fois_disponible": 0})
     db.commit()
     db.refresh(member)
     return member
@@ -122,7 +123,41 @@ def reset_all_counters(
     db: Session = Depends(get_db),
     _: Member = Depends(require_bureau),
 ):
-    db.query(Member).update(
-        {"heures_cumulees": 0.0, "shifts_respo_bar_cumules": 0}
-    )
+    db.query(Member).update({"shifts_respo_bar_cumules": 0})
+    db.query(StatsMemberHeureRelative).update({"fois_staffe": 0, "fois_disponible": 0})
     db.commit()
+
+
+@router.get("/{member_id}/stats", response_model=MemberStatsRead)
+def get_member_stats(
+    member_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(get_current_member),
+):
+    member = db.query(Member).filter(Member.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    stats = db.query(StatsMemberHeureRelative).filter(
+        StatsMemberHeureRelative.membre_id == member_id
+    ).order_by(StatsMemberHeureRelative.heure_relative).all()
+
+    afterwork = [
+        MemberStatsEntry(
+            heure_relative=s.heure_relative,
+            fois_disponible=s.fois_disponible,
+            fois_staffe=s.fois_staffe,
+        )
+        for s in stats
+        if s.type_evenement == EventTypeEnum.afterwork
+    ]
+    soiree = [
+        MemberStatsEntry(
+            heure_relative=s.heure_relative,
+            fois_disponible=s.fois_disponible,
+            fois_staffe=s.fois_staffe,
+        )
+        for s in stats
+        if s.type_evenement == EventTypeEnum.soiree
+    ]
+    return MemberStatsRead(afterwork=afterwork, soiree=soiree)

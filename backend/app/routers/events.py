@@ -15,9 +15,11 @@ from ..models.models import (
     Availability,
     Event,
     EventStatutEnum,
+    EventTypeEnum,
     Member,
     ResponsableBar,
     Slot,
+    StatsMemberHeureRelative,
 )
 from ..schemas.schemas import (
     AffinityCreate,
@@ -37,7 +39,7 @@ from ..schemas.schemas import (
     WarningItem,
 )
 from ..services import csv_import as csv_svc
-from ..services.scheduler import generate_schedule
+from ..services.scheduler import generate_schedule, check_manual_assignment
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -356,6 +358,9 @@ def add_assignment(
     _: Member = Depends(require_bureau),
 ):
     _get_event_or_404(db, event_id)
+    error = check_manual_assignment(db, event_id, payload.membre_id, payload.creneau_id)
+    if error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error)
     slot = db.query(Slot).filter(
         Slot.id == payload.creneau_id, Slot.evenement_id == event_id
     ).first()
@@ -476,17 +481,38 @@ def publish_event(
 
     # Track respo_bar members for this event
     respo_bar_members: set = set()
-    hours_delta: dict = {}
+
+    slots_map = {
+        s.id: s
+        for s in db.query(Slot).filter(Slot.evenement_id == event_id).all()
+    }
 
     for a in assignments:
-        hours_delta[a.membre_id] = hours_delta.get(a.membre_id, 0) + 1  # each slot = 1h
         if a.type == AssignmentTypeEnum.respo_bar:
             respo_bar_members.add(a.membre_id)
-
-    for member_id, delta in hours_delta.items():
-        member = db.query(Member).filter(Member.id == member_id).first()
-        if member:
-            member.heures_cumulees = (member.heures_cumulees or 0.0) + delta
+        slot = slots_map.get(a.creneau_id)
+        if not slot:
+            continue
+        hr = slot.heure_relative
+        stat = (
+            db.query(StatsMemberHeureRelative)
+            .filter_by(
+                membre_id=a.membre_id,
+                type_evenement=event.type,
+                heure_relative=hr,
+            )
+            .first()
+        )
+        if stat:
+            stat.fois_staffe += 1
+        else:
+            db.add(StatsMemberHeureRelative(
+                membre_id=a.membre_id,
+                type_evenement=event.type,
+                heure_relative=hr,
+                fois_disponible=0,
+                fois_staffe=1,
+            ))
 
     for member_id in respo_bar_members:
         member = db.query(Member).filter(Member.id == member_id).first()

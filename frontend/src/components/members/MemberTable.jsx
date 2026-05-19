@@ -4,7 +4,7 @@ const ROLE_COLORS = {
   bureau: 'bg-blue-100 text-blue-800',
 }
 
-export default function MemberTable({ members, isBureau, onEdit, onDelete, onResetCounters }) {
+export default function MemberTable({ members, isBureau, onEdit, onDelete, onResetCounters, onStats }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
       <table className="min-w-full text-sm">
@@ -13,8 +13,8 @@ export default function MemberTable({ members, isBureau, onEdit, onDelete, onRes
             <th className="px-4 py-3 text-left">Nom</th>
             <th className="px-4 py-3 text-left">Email</th>
             <th className="px-4 py-3 text-left">Rôles</th>
-            <th className="px-4 py-3 text-right">Heures</th>
             <th className="px-4 py-3 text-right">Respo bar</th>
+            <th className="px-4 py-3 text-right">Stats</th>
             {isBureau && <th className="px-4 py-3 text-right">Actions</th>}
           </tr>
         </thead>
@@ -34,8 +34,15 @@ export default function MemberTable({ members, isBureau, onEdit, onDelete, onRes
                   ))}
                 </div>
               </td>
-              <td className="px-4 py-3 text-right tabular-nums">{m.heures_cumulees.toFixed(1)}h</td>
               <td className="px-4 py-3 text-right tabular-nums">{m.shifts_respo_bar_cumules}</td>
+              <td className="px-4 py-3 text-right">
+                <button
+                  onClick={() => onStats(m)}
+                  className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100"
+                >
+                  Voir stats
+                </button>
+              </td>
               {isBureau && (
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">

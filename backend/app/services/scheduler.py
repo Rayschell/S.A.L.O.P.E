@@ -1,27 +1,36 @@
 """
 Scheduling algorithm for bar event planning.
 
-Rules (absolute, never violated):
-  R1 - Max 2 consecutive slots per block (= 2h)
-  R4 - Prefer 2h blocks over 1h blocks (optimal block decomposition)
-  R5 - Only assign to slots where member has "yes" (priority) or "maybe" (last resort)
+Priority order (descending):
+  1. R1, R2, R4, R5, R6  — absolute rules, never violated
+  2. R3                   — strong preference (1h pause > 2h pause > 3h+)
+  3. Quota (escalation palier)
+  4. (Soirée) ≥1 respo bar per slot
+  5. ≥1 bureau per slot   — replace worst non-bureau if slot full (never exceed max_personnes)
+  6. fois_staffe total for this event type (ascending)
+  7. taux d'utilisation at heure_relative H (ascending)
+  8. Affinity (tie-break)
 
-Preferences (soft, honored via sort key):
-  R2 - Prefer min 1 slot pause (= 1h) between two blocks; longer pauses allowed if unavoidable
-  R3 - Prefer shortest possible pause between blocks; no hard maximum
+Rules:
+  R1  — max 2 consecutive slots per block (absolute)
+  R2  — min 1h pause between two separate blocks (absolute; covered by R1 check)
+  R3  — pause preference: 1h > 2h > 3h+ (non-blocking, sort key)
+  R4  — prefer 2h blocks over 1h (absolute: Group A before Group B)
+  R5  — "no" availability inviolable; "maybe" = last resort (flagged maybe_force)
+  R6  — max_personnes is an absolute upper bound, never exceeded for any reason
 
-Escalation order:
-  Palier 1 : all members,    quota 2h   (yes only, then maybe)
-  Palier 2 : bureau,         quota 3h
+Escalation:
+  Palier 1 : all members,    quota 2h
+  Palier 2 : bureau only,    quota 3h
   Palier 3 : non-bureau,     quota 3h
-  Palier 4 : bureau,         quota 4h
+  Palier 4 : bureau only,    quota 4h
   Palier 5 : non-bureau,     quota 4h
   ...
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -36,6 +45,7 @@ from ..models.models import (
     Member,
     ResponsableBar,
     Slot,
+    StatsMemberHeureRelative,
 )
 
 
@@ -63,7 +73,7 @@ class _SlotAssignment:
 class _MemberState:
     """
     Tracks slot assignments for one member during a scheduling run.
-    Enforces R1 (max 2 consecutive), R2 (min 1 pause), R3 (max 2 pause).
+    Provides R1/R2 feasibility checks (run <= 2 consecutive) and pause analysis.
     """
 
     def __init__(self, member_id: int):
@@ -78,74 +88,68 @@ class _MemberState:
     def index_set(self) -> Set[int]:
         return set(self._indices)
 
-    def _blocks(self) -> List[List[int]]:
-        """Return sorted list of blocks (each block = sorted list of consecutive indices)."""
-        if not self._indices:
-            return []
-        sorted_idx = sorted(self._indices)
-        blocks: List[List[int]] = [[sorted_idx[0]]]
-        for idx in sorted_idx[1:]:
-            if idx == blocks[-1][-1] + 1:
-                blocks[-1].append(idx)
-            else:
-                blocks.append([idx])
-        return blocks
-
     def can_assign_at(self, slot_idx: int, quota: int) -> bool:
         """
-        Return True iff assigning slot_idx respects R1, R2, R3 and quota.
-        Does NOT check R4 (block size preference) — caller handles that.
+        True iff assigning slot_idx respects R1 (max 2 consecutive) and quota.
+        R2 (min 1h pause between blocks) is automatically satisfied when R1 holds.
         """
         if self.hours_assigned >= quota:
             return False
         s = self.index_set
         if slot_idx in s:
             return False
+        run = 1
+        j = slot_idx - 1
+        while j in s:
+            run += 1
+            j -= 1
+        j = slot_idx + 1
+        while j in s:
+            run += 1
+            j += 1
+        return run <= 2
 
-        # R1 — cannot extend a block beyond 2 consecutive slots
-        # Slot would extend left: [slot_idx, slot_idx+1] already exists → forbidden
-        if (slot_idx + 1) in s and (slot_idx - 1) not in s:
-            # slot_idx is immediately before an existing single slot → would create [slot_idx, slot_idx+1]
-            # Only forbidden if that slot_idx+1 is already part of a 2-slot block
-            if (slot_idx + 2) in s:
-                return False  # block [slot_idx+1, slot_idx+2] exists → can't prepend
-        # Slot would extend right: [slot_idx-1, slot_idx] continuation
-        if (slot_idx - 1) in s:
-            if (slot_idx - 2) in s:
-                return False  # block already 2h long (slot_idx-2, slot_idx-1) → R1 violated
-        # Slot would bridge two existing blocks → R1 violated
-        if (slot_idx - 1) in s and (slot_idx + 1) in s:
-            return False
-
-        # R2/R3 — pauses between blocks are preferences, not hard constraints.
-        # Long pauses are allowed; the sort key in _fill_pass prefers shorter gaps.
-
-        return True
-
-    def _last_block_end(self) -> Optional[int]:
-        """Index of the last assigned slot, or None."""
+    def last_block_end(self) -> Optional[int]:
         return max(self._indices) if self._indices else None
 
-    def preferred_next_start(self) -> Optional[int]:
+    def r3_priority(self, slot_idx: int) -> int:
         """
-        For escalation: return the preferred next-block start index (R3 priority 1 = pause 1h,
-        then priority 2 = pause 2h). Returns None if no existing block.
+        0 = no previous block or extending current block or 1h pause (preferred)
+        1 = 2h pause (tolerated)
+        2 = 3h+ pause (deconseille, triggers W7)
         """
-        end = self._last_block_end()
+        s = self.index_set
+        end = self.last_block_end()
         if end is None:
-            return None
-        return end + 2  # pause 1h preferred
-
-    def allowed_next_starts(self) -> List[int]:
-        """Returns [end+2, end+3] — pause 1h preferred (R3)."""
-        end = self._last_block_end()
-        if end is None:
-            return []
-        return [end + 2, end + 3]
+            return 0
+        if (slot_idx - 1) in s:
+            return 0  # extending current block
+        gap = slot_idx - end - 1
+        if gap <= 1:
+            return 0
+        if gap == 2:
+            return 1
+        return 2
 
     def assign(self, slot_idx: int) -> None:
         self._indices.append(slot_idx)
         self._indices.sort()
+
+    def unassign(self, slot_idx: int) -> None:
+        if slot_idx in self._indices:
+            self._indices.remove(slot_idx)
+
+    def blocks(self) -> List[List[int]]:
+        if not self._indices:
+            return []
+        sorted_idx = sorted(self._indices)
+        result: List[List[int]] = [[sorted_idx[0]]]
+        for idx in sorted_idx[1:]:
+            if idx == result[-1][-1] + 1:
+                result[-1].append(idx)
+            else:
+                result.append([idx])
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +172,7 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
         key=lambda s: s.heure_debut,
     )
     if not slots:
-        return [WarningItem(type="no_slots", message="Aucun créneau configuré")]
+        return [WarningItem(type="no_slots", message="Aucun créneau configure")]
 
     n = len(slots)
     slot_id_to_idx: Dict[int, int] = {s.id: i for i, s in enumerate(slots)}
@@ -183,17 +187,30 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
         if idx is not None:
             avail[(av.membre_id, idx)] = av.statut.value
 
-    # Affinity pairs (bidirectional set of (a_id, b_id))
+    # Stats for sorting
+    total_fois_staffe: Dict[int, int] = {m.id: 0 for m in all_members}
+    stats_at: Dict[Tuple[int, int], Tuple[int, int]] = {}  # (member_id, hr) -> (fd, fs)
+    for stat in db.query(StatsMemberHeureRelative).filter(
+        StatsMemberHeureRelative.type_evenement == event.type
+    ).all():
+        stats_at[(stat.membre_id, stat.heure_relative)] = (
+            stat.fois_disponible, stat.fois_staffe
+        )
+        total_fois_staffe[stat.membre_id] = (
+            total_fois_staffe.get(stat.membre_id, 0) + stat.fois_staffe
+        )
+
+    def taux_at(member_id: int, heure_relative: int) -> float:
+        fd, fs = stats_at.get((member_id, heure_relative), (0, 0))
+        return fs / fd if fd > 0 else 0.0
+
+    # Affinity pairs (bidirectional)
     affinity_set: Set[Tuple[int, int]] = set()
-    for ac in db.query(AffinityConstraint).filter(AffinityConstraint.evenement_id == event_id).all():
+    for ac in db.query(AffinityConstraint).filter(
+        AffinityConstraint.evenement_id == event_id
+    ).all():
         affinity_set.add((ac.membre_a_id, ac.membre_b_id))
         affinity_set.add((ac.membre_b_id, ac.membre_a_id))
-
-    # Number of available slots per member (yes + maybe) — used for "most constrained first" heuristic
-    avail_count: Dict[int, int] = {
-        m.id: sum(1 for i in range(n) if avail.get((m.id, i), "no") != "no")
-        for m in all_members
-    }
 
     # ------------------------------------------------------------------
     # Remove previous auto assignments
@@ -206,7 +223,7 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
     db.flush()
 
     # ------------------------------------------------------------------
-    # Load remaining manual assignments into working structures
+    # Load existing manual assignments
     # ------------------------------------------------------------------
     assignments: List[List[_SlotAssignment]] = [[] for _ in range(n)]
     member_states: Dict[int, _MemberState] = {m.id: _MemberState(m.id) for m in all_members}
@@ -229,48 +246,47 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
     warnings: List[WarningItem] = []
 
     # ------------------------------------------------------------------
-    # Étape 1 — Placement des respos bar (soirée only)
+    # Etape 1 -- Placement des respos bar (soiree only)
     # ------------------------------------------------------------------
     if event.type == EventTypeEnum.soiree:
         warnings += _place_respos_bar(
-            db, event, slots, all_members, member_map, avail,
-            assignments, member_states,
+            db, event, slots, n, all_members, member_map, avail,
+            assignments, member_states, total_fois_staffe,
         )
 
     # ------------------------------------------------------------------
-    # Étape 2 — Remplissage des créneaux via escalade
+    # Etape 2 -- Remplissage via escalade
     # ------------------------------------------------------------------
     bureau = [m for m in all_members if m.roles and "bureau" in m.roles]
-    non_bureau = [m for m in all_members if not m.roles or "bureau" not in m.roles]
+    non_bureau = [m for m in all_members if not (m.roles and "bureau" in m.roles)]
 
-    # Palier 1 : tous, quota 2h  (yes first, then maybe)
-    # Paliers suivants : bureau/non-bureau alternés, quota croissant
     escalation: List[Tuple[List[Member], int]] = [(all_members, 2)]
-    for quota in range(3, n + 1):
+    for quota in range(3, n + 2):
         escalation.append((bureau, quota))
         escalation.append((non_bureau, quota))
 
-    # Track which palier each member reaches (for W4 warning)
     member_escalation_palier: Dict[int, int] = {}
 
     for palier_idx, (target, quota) in enumerate(escalation, start=1):
-        # Incomplete = not yet at max_personnes
         if all(len(assignments[i]) >= slots[i].max_personnes for i in range(n)):
             break
 
         prev_hours = {m.id: member_states[m.id].hours_assigned for m in target}
 
-        # 2a — yes candidates only
-        _fill_pass(slots, n, target, member_map, avail, affinity_set,
-                   assignments, member_states, quota, avail_count, use_maybe=False)
-        # 2b — maybe candidates (before escalating further)
-        _fill_pass(slots, n, target, member_map, avail, affinity_set,
-                   assignments, member_states, quota, avail_count, use_maybe=True)
+        _fill_pass(
+            slots, n, target, member_map, avail, affinity_set,
+            assignments, member_states, quota, taux_at, total_fois_staffe,
+            use_maybe=False,
+        )
+        _fill_pass(
+            slots, n, target, member_map, avail, affinity_set,
+            assignments, member_states, quota, taux_at, total_fois_staffe,
+            use_maybe=True,
+        )
 
-        # Record escalation palier for members who got extra hours this round
         for m in target:
             if member_states[m.id].hours_assigned > prev_hours[m.id] and palier_idx > 1:
-                member_escalation_palier[m.id] = palier_idx
+                member_escalation_palier.setdefault(m.id, palier_idx)
 
     # ------------------------------------------------------------------
     # Persist new auto assignments
@@ -289,7 +305,7 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
     db.commit()
 
     # ------------------------------------------------------------------
-    # Étape 3 — Warnings W1–W7
+    # Etape 3 -- Warnings W1-W7
     # ------------------------------------------------------------------
     warnings += _generate_warnings(
         event, slots, member_map, assignments, affinity_set, member_escalation_palier
@@ -298,7 +314,7 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
 
 
 # ---------------------------------------------------------------------------
-# Étape 1 — Placement des respos bar
+# Etape 1 -- Placement des respos bar
 # ---------------------------------------------------------------------------
 
 
@@ -306,22 +322,16 @@ def _place_respos_bar(
     db: Session,
     event: Event,
     slots: List[Slot],
+    n: int,
     all_members: List[Member],
     member_map: Dict[int, Member],
     avail: Dict[Tuple[int, int], str],
     assignments: List[List[_SlotAssignment]],
     member_states: Dict[int, _MemberState],
+    total_fois_staffe: Dict[int, int],
 ) -> List[WarningItem]:
-    """
-    Étape 1b : couvre tous les créneaux avec au moins 1 respo bar.
-    Blocs de 2h consécutives; chaque respo bar est utilisé pour un bloc.
-    Si la liste désignée est insuffisante, complète avec les membres bureau
-    triés par shifts_respo_bar_cumules croissant.
-    """
     warnings: List[WarningItem] = []
-    n = len(slots)
 
-    # 1a — liste ordonnée des candidats respo bar
     designated_ids: List[int] = [
         r.membre_id
         for r in sorted(
@@ -332,11 +342,10 @@ def _place_respos_bar(
 
     bureau_fallback = sorted(
         [m for m in all_members if m.roles and "bureau" in m.roles],
-        key=lambda m: (m.shifts_respo_bar_cumules, m.heures_cumulees),
+        key=lambda m: (m.shifts_respo_bar_cumules, total_fois_staffe.get(m.id, 0)),
     )
     bureau_fallback_ids = [m.id for m in bureau_fallback]
 
-    # Merge: designated first, then bureau by shifts (no duplicates)
     candidate_ids: List[int] = []
     seen: Set[int] = set()
     for mid in designated_ids + bureau_fallback_ids:
@@ -344,84 +353,83 @@ def _place_respos_bar(
             candidate_ids.append(mid)
             seen.add(mid)
 
-    # Tracks how many respo-bar blocks each candidate has done this run
-    # (allows reuse for a second block if R2/R3/R4 are respected)
-    cand_ptr = 0  # next candidate to try for a new block
     slot_idx = 0
-
     while slot_idx < n:
-        # Check if this slot already has a respo bar (from manual assignment)
+        slot = slots[slot_idx]
+
         if any(a.asgn_type == "respo_bar" for a in assignments[slot_idx]):
             slot_idx += 1
             continue
 
-        # Try to place a 2h block starting at slot_idx
-        # (block_end = slot_idx+1 if it exists, else slot_idx alone)
-        block_end = slot_idx + 1 if slot_idx + 1 < n else slot_idx
-
         placed = False
+        next_idx = slot_idx + 1 if slot_idx + 1 < n else None
 
-        # Try candidates in order (cycling through the full list each uncovered slot,
-        # not just advancing the pointer, to allow reuse for second blocks)
-        for try_new_block in (True, False):
-            # try_new_block=True: prefer candidates who haven't done a block yet
-            # try_new_block=False: allow reuse
-            for i, mid in enumerate(candidate_ids):
-                ms = member_states[mid]
-                avail_start = avail.get((mid, slot_idx), "no")
-                if avail_start == "no":
-                    continue
+        for mid in candidate_ids:
+            if mid not in member_map:
+                continue
+            ms = member_states[mid]
+            avail_here = avail.get((mid, slot_idx), "no")
+            if avail_here == "no":
+                continue
 
-                # R1/R2/R3 check for first slot of block
-                if not ms.can_assign_at(slot_idx, n):
-                    continue
+            # R6: slot must have room
+            if sum(1 for a in assignments[slot_idx] if a.member_id != mid) >= slot.max_personnes:
+                continue
 
-                # Attempt 2h block
+            # R1/R2
+            if not ms.can_assign_at(slot_idx, n):
+                continue
+
+            if any(a.member_id == mid for a in assignments[slot_idx]):
+                continue
+
+            # Attempt 2h block (R4)
+            can_do_2h = False
+            if next_idx is not None:
+                avail_next = avail.get((mid, next_idx), "no")
+                next_has_room = (
+                    sum(1 for a in assignments[next_idx] if a.member_id != mid)
+                    < slots[next_idx].max_personnes
+                )
+                already_next = any(a.member_id == mid for a in assignments[next_idx])
                 can_do_2h = (
-                    block_end != slot_idx
-                    and avail.get((mid, block_end), "no") != "no"
-                    and ms.can_assign_at(block_end, n)
+                    avail_next != "no"
+                    and ms.can_assign_at(next_idx, n)
+                    and next_has_room
+                    and not already_next
                 )
 
-                # Assign first slot
-                if not any(a.member_id == mid for a in assignments[slot_idx]):
-                    assignments[slot_idx].append(_SlotAssignment(
-                        member_id=mid,
-                        asgn_type="respo_bar",
-                        source="auto",
-                        maybe_force=(avail_start == "maybe"),
-                    ))
-                    ms.assign(slot_idx)
+            assignments[slot_idx].append(_SlotAssignment(
+                member_id=mid,
+                asgn_type="respo_bar",
+                source="auto",
+                maybe_force=(avail_here == "maybe"),
+            ))
+            ms.assign(slot_idx)
 
-                # Assign second slot if possible (R4 — prefer 2h blocks)
-                if can_do_2h:
-                    avail_end = avail.get((mid, block_end), "no")
-                    if not any(a.member_id == mid for a in assignments[block_end]):
-                        assignments[block_end].append(_SlotAssignment(
-                            member_id=mid,
-                            asgn_type="respo_bar",
-                            source="auto",
-                            maybe_force=(avail_end == "maybe"),
-                        ))
-                        ms.assign(block_end)
-                    # Skip the second slot in the outer loop since it's now covered
-                    slot_idx += 2
-                else:
-                    slot_idx += 1
+            if can_do_2h:
+                avail_next = avail.get((mid, next_idx), "no")
+                assignments[next_idx].append(_SlotAssignment(
+                    member_id=mid,
+                    asgn_type="respo_bar",
+                    source="auto",
+                    maybe_force=(avail_next == "maybe"),
+                ))
+                ms.assign(next_idx)
+                slot_idx += 2
+            else:
+                slot_idx += 1
 
-                placed = True
-                break
-
-            if placed:
-                break
+            placed = True
+            break
 
         if not placed:
             warnings.append(WarningItem(
                 type="no_respo_bar",
-                slot_id=slots[slot_idx].id,
+                slot_id=slot.id,
                 message=(
-                    f"Créneau {slots[slot_idx].heure_debut.strftime('%H:%M')} : "
-                    "impossible de placer un respo bar"
+                    f"Creneau {slot.heure_debut.strftime('%H:%M')} : "
+                    "impossible de placer un respo bar (W1)"
                 ),
             ))
             slot_idx += 1
@@ -430,7 +438,7 @@ def _place_respos_bar(
 
 
 # ---------------------------------------------------------------------------
-# Étape 2 — Remplissage des créneaux (staff + escalade)
+# Etape 2 -- Remplissage des creneaux
 # ---------------------------------------------------------------------------
 
 
@@ -444,42 +452,27 @@ def _fill_pass(
     assignments: List[List[_SlotAssignment]],
     member_states: Dict[int, _MemberState],
     quota: int,
-    avail_count: Dict[int, int],
+    taux_at: Callable[[int, int], float],
+    total_fois_staffe: Dict[int, int],
     use_maybe: bool,
 ) -> None:
-    """
-    One pass over all slots for the given target_members at the given quota.
-    use_maybe=False  → only "yes" availability
-    use_maybe=True   → also "maybe" (flagged maybe_force)
-
-    Implements R1–R5 and the R4 block-of-2h preference.
-    For escalation paliers (quota > 2): enforces R3 (max pause 2h).
-    Guarantees at least 1 bureau per slot (may exceed max_personnes by 1).
-    """
     for slot_idx, slot in enumerate(slots):
-        current_count = len(assignments[slot_idx])
-        if current_count >= slot.max_personnes:
+        if len(assignments[slot_idx]) >= slot.max_personnes:
             continue
 
-        needed = slot.max_personnes - current_count
-        already_on_slot = {a.member_id for a in assignments[slot_idx]}
+        already_on_slot: Set[int] = {a.member_id for a in assignments[slot_idx]}
+        hr = slot.heure_relative
+        has_bureau = _slot_has_bureau(assignments[slot_idx], member_map)
 
-        has_bureau = any(
-            "bureau" in (member_map[a.member_id].roles or [])
-            for a in assignments[slot_idx]
-            if a.member_id in member_map
-        )
-
-        # Build candidate list
-        yes_2h: List[Member] = []   # can do 2h block here (R4 preferred)
-        yes_1h: List[Member] = []   # can only do 1h here
-        maybe_2h: List[Member] = []
-        maybe_1h: List[Member] = []
+        grp_yes_2h: List[Member] = []
+        grp_yes_1h: List[Member] = []
+        grp_maybe_2h: List[Member] = []
+        grp_maybe_1h: List[Member] = []
 
         for m in target_members:
             if m.id in already_on_slot:
                 continue
-            if not _can_place(m.id, slot_idx, quota, member_states, avail, n):
+            if not member_states[m.id].can_assign_at(slot_idx, quota):
                 continue
             status = avail.get((m.id, slot_idx), "no")
             if status == "no":
@@ -487,161 +480,205 @@ def _fill_pass(
             if status == "maybe" and not use_maybe:
                 continue
 
-            # R4: check if 2h block is possible at slot_idx
-            can_2h = (
-                slot_idx + 1 < n
-                and _can_place(m.id, slot_idx + 1, quota, member_states, avail, n)
-                and avail.get((m.id, slot_idx + 1), "no") not in ("no",)
-                and (avail.get((m.id, slot_idx + 1), "no") != "maybe" or use_maybe)
+            can_2h = _can_do_2h(
+                m.id, slot_idx, n, quota, avail, assignments, member_states, use_maybe
             )
 
             if status == "yes":
-                if can_2h:
-                    yes_2h.append(m)
-                else:
-                    yes_1h.append(m)
-            else:  # maybe
-                if can_2h:
-                    maybe_2h.append(m)
-                else:
-                    maybe_1h.append(m)
-
-        def _sort_key(m: Member) -> tuple:
-            is_bureau = bool(m.roles and "bureau" in m.roles)
-            bureau_prio = 0 if (not has_bureau and is_bureau) else (1 if is_bureau else 2)
-            has_affinity = any((m.id, oid) in affinity_set for oid in already_on_slot)
-            # Most constrained first: prefer members with fewer available slots
-            constrained = avail_count.get(m.id, n)
-            # Prefer shorter pause from last block (R2/R3 as preference)
-            ms_m = member_states[m.id]
-            last_end = ms_m._last_block_end()
-            if last_end is not None and (slot_idx - 1) not in ms_m.index_set:
-                pause_gap = slot_idx - last_end - 1
+                (grp_yes_2h if can_2h else grp_yes_1h).append(m)
             else:
-                pause_gap = 0
-            return (bureau_prio, constrained, m.heures_cumulees, pause_gap, -int(has_affinity))
+                (grp_maybe_2h if can_2h else grp_maybe_1h).append(m)
 
-        for lst in (yes_2h, yes_1h, maybe_2h, maybe_1h):
-            lst.sort(key=_sort_key)
+        def sort_key(m: Member) -> tuple:
+            ms = member_states[m.id]
+            r3 = ms.r3_priority(slot_idx)
+            total_fs = total_fois_staffe.get(m.id, 0)
+            taux = taux_at(m.id, hr)
+            has_aff = any((m.id, oid) in affinity_set for oid in already_on_slot)
+            return (r3, total_fs, taux, -int(has_aff))
 
-        # R4: prioritise 2h-capable candidates
-        ordered_candidates = yes_2h + yes_1h + maybe_2h + maybe_1h
-        two_h_member_ids = {m.id for m in yes_2h + maybe_2h}
+        for grp in (grp_yes_2h, grp_yes_1h, grp_maybe_2h, grp_maybe_1h):
+            grp.sort(key=sort_key)
 
+        two_h_set = {m.id for m in grp_yes_2h + grp_maybe_2h}
+        ordered = grp_yes_2h + grp_yes_1h + grp_maybe_2h + grp_maybe_1h
+
+        needed = slot.max_personnes - len(assignments[slot_idx])
         placed = 0
-        for m in ordered_candidates:
+
+        for m in ordered:
             if placed >= needed:
                 break
-            # Re-check (state may have changed from earlier placements this pass)
-            if not _can_place(m.id, slot_idx, quota, member_states, avail, n):
+            if len(assignments[slot_idx]) >= slot.max_personnes:
+                break
+            ms = member_states[m.id]
+            if not ms.can_assign_at(slot_idx, quota):
                 continue
             status = avail.get((m.id, slot_idx), "no")
-            if status == "no":
+            if status == "no" or (status == "maybe" and not use_maybe):
                 continue
-            if status == "maybe" and not use_maybe:
+            if m.id in {a.member_id for a in assignments[slot_idx]}:
                 continue
-            already_on_slot.add(m.id)
+
             assignments[slot_idx].append(_SlotAssignment(
                 member_id=m.id,
                 asgn_type="staff",
                 source="auto",
                 maybe_force=(status == "maybe"),
             ))
-            member_states[m.id].assign(slot_idx)
-            if "bureau" in (m.roles or []):
+            ms.assign(slot_idx)
+            already_on_slot.add(m.id)
+            if m.roles and "bureau" in m.roles:
                 has_bureau = True
             placed += 1
 
-            # R4: immediately extend to 2h block (reserve slot+1 before others can take it)
-            if m.id in two_h_member_ids and slot_idx + 1 < n:
-                status_next = avail.get((m.id, slot_idx + 1), "no")
-                next_not_assigned = m.id not in {a.member_id for a in assignments[slot_idx + 1]}
-                if (
-                    status_next != "no"
-                    and (status_next != "maybe" or use_maybe)
-                    and next_not_assigned
-                    and _can_place(m.id, slot_idx + 1, quota, member_states, avail, n)
-                ):
-                    assignments[slot_idx + 1].append(_SlotAssignment(
-                        member_id=m.id,
-                        asgn_type="staff",
-                        source="auto",
-                        maybe_force=(status_next == "maybe"),
-                    ))
-                    member_states[m.id].assign(slot_idx + 1)
+            # R4: extend to 2h block immediately
+            if m.id in two_h_set and slot_idx + 1 < n:
+                _try_extend_2h(
+                    m, slot_idx + 1, slots[slot_idx + 1],
+                    avail, assignments, member_states, quota, use_maybe,
+                )
 
-        # Guarantee at least 1 bureau (even if it exceeds max_personnes)
+        # Bureau guarantee (R6 respected: replace, never add over max)
         if not has_bureau:
-            _force_bureau(
+            _ensure_bureau(
                 slot_idx, slot, target_members, member_map, avail,
-                affinity_set, assignments, member_states, quota,
-                already_on_slot, use_maybe,
+                assignments, member_states, quota,
+                already_on_slot, use_maybe, total_fois_staffe, taux_at,
             )
 
 
-def _can_place(
+def _can_do_2h(
     member_id: int,
     slot_idx: int,
-    quota: int,
-    member_states: Dict[int, _MemberState],
-    avail: Dict[Tuple[int, int], str],
     n: int,
-) -> bool:
-    """
-    Check R1/R2/R3 via _MemberState.can_assign_at, plus quota.
-    For escalation (quota > 2), also enforces R3:
-    a new block start must be at most 2 slots after the last block end.
-    """
-    ms = member_states[member_id]
-    if not ms.can_assign_at(slot_idx, quota):
-        return False
-
-    # For members who already have at least one block and are starting a NEW block
-    # (slot_idx-1 not in their index_set), R3 is already enforced by can_assign_at.
-    return True
-
-
-def _force_bureau(
-    slot_idx: int,
-    slot: Slot,
-    target_members: List[Member],
-    member_map: Dict[int, Member],
+    quota: int,
     avail: Dict[Tuple[int, int], str],
-    affinity_set: Set[Tuple[int, int]],
+    assignments: List[List[_SlotAssignment]],
+    member_states: Dict[int, _MemberState],
+    use_maybe: bool,
+) -> bool:
+    if slot_idx + 1 >= n:
+        return False
+    ms = member_states[member_id]
+    next_status = avail.get((member_id, slot_idx + 1), "no")
+    if next_status == "no":
+        return False
+    if next_status == "maybe" and not use_maybe:
+        return False
+    return ms.can_assign_at(slot_idx + 1, quota)
+
+
+def _try_extend_2h(
+    m: Member,
+    next_idx: int,
+    next_slot: Slot,
+    avail: Dict[Tuple[int, int], str],
     assignments: List[List[_SlotAssignment]],
     member_states: Dict[int, _MemberState],
     quota: int,
-    already_on_slot: Set[int],
     use_maybe: bool,
 ) -> None:
-    """
-    Force at least one bureau member onto slot_idx if none is present.
-    May exceed max_personnes by 1. Respects R1–R5.
-    """
-    bureau_candidates = [
-        m for m in target_members
-        if m.id not in already_on_slot
-        and "bureau" in (m.roles or [])
-        and _can_place(m.id, slot_idx, quota, member_states, avail, len(assignments))
-        and avail.get((m.id, slot_idx), "no") not in ("no",)
-        and (avail.get((m.id, slot_idx), "no") != "maybe" or use_maybe)
-    ]
-    if not bureau_candidates:
+    ms = member_states[m.id]
+    if len(assignments[next_idx]) >= next_slot.max_personnes:
         return
-    bureau_candidates.sort(key=lambda m: m.heures_cumulees)
-    m = bureau_candidates[0]
-    status = avail.get((m.id, slot_idx), "no")
-    assignments[slot_idx].append(_SlotAssignment(
+    status = avail.get((m.id, next_idx), "no")
+    if status == "no" or (status == "maybe" and not use_maybe):
+        return
+    if not ms.can_assign_at(next_idx, quota):
+        return
+    if any(a.member_id == m.id for a in assignments[next_idx]):
+        return
+    assignments[next_idx].append(_SlotAssignment(
         member_id=m.id,
         asgn_type="staff",
         source="auto",
         maybe_force=(status == "maybe"),
     ))
-    member_states[m.id].assign(slot_idx)
+    ms.assign(next_idx)
+
+
+def _ensure_bureau(
+    slot_idx: int,
+    slot: Slot,
+    target_members: List[Member],
+    member_map: Dict[int, Member],
+    avail: Dict[Tuple[int, int], str],
+    assignments: List[List[_SlotAssignment]],
+    member_states: Dict[int, _MemberState],
+    quota: int,
+    already_on_slot: Set[int],
+    use_maybe: bool,
+    total_fois_staffe: Dict[int, int],
+    taux_at: Callable[[int, int], float],
+) -> None:
+    """
+    Guarantee >=1 bureau on slot_idx. Never exceed max_personnes (R6).
+    If room: add best bureau.
+    If full: replace auto non-bureau with highest fois_staffe with best bureau.
+    """
+    bureau_candidates = [
+        m for m in target_members
+        if m.id not in already_on_slot
+        and "bureau" in (m.roles or [])
+        and member_states[m.id].can_assign_at(slot_idx, quota)
+        and avail.get((m.id, slot_idx), "no") != "no"
+        and (avail.get((m.id, slot_idx), "no") != "maybe" or use_maybe)
+    ]
+    if not bureau_candidates:
+        return  # W3 emitted in _generate_warnings
+
+    bureau_candidates.sort(
+        key=lambda m: (total_fois_staffe.get(m.id, 0), taux_at(m.id, slot_idx))
+    )
+    best_bureau = bureau_candidates[0]
+
+    if len(assignments[slot_idx]) < slot.max_personnes:
+        status = avail.get((best_bureau.id, slot_idx), "no")
+        assignments[slot_idx].append(_SlotAssignment(
+            member_id=best_bureau.id,
+            asgn_type="staff",
+            source="auto",
+            maybe_force=(status == "maybe"),
+        ))
+        member_states[best_bureau.id].assign(slot_idx)
+    else:
+        # Replace worst auto non-bureau
+        auto_non_bureau = [
+            a for a in assignments[slot_idx]
+            if a.source == "auto"
+            and a.member_id in member_map
+            and "bureau" not in (member_map[a.member_id].roles or [])
+        ]
+        if not auto_non_bureau:
+            return
+        auto_non_bureau.sort(
+            key=lambda a: total_fois_staffe.get(a.member_id, 0),
+            reverse=True,
+        )
+        worst = auto_non_bureau[0]
+        assignments[slot_idx].remove(worst)
+        member_states[worst.member_id].unassign(slot_idx)
+        status = avail.get((best_bureau.id, slot_idx), "no")
+        assignments[slot_idx].append(_SlotAssignment(
+            member_id=best_bureau.id,
+            asgn_type="staff",
+            source="auto",
+            maybe_force=(status == "maybe"),
+        ))
+        member_states[best_bureau.id].assign(slot_idx)
+
+
+def _slot_has_bureau(asgns: List[_SlotAssignment], member_map: Dict[int, Member]) -> bool:
+    return any(
+        "bureau" in (member_map[a.member_id].roles or [])
+        for a in asgns
+        if a.member_id in member_map
+    )
 
 
 # ---------------------------------------------------------------------------
-# Étape 3 — Génération des warnings W1–W7
+# Etape 3 -- Warnings W1-W7
 # ---------------------------------------------------------------------------
 
 
@@ -654,46 +691,40 @@ def _generate_warnings(
     member_escalation_palier: Dict[int, int],
 ) -> List[WarningItem]:
     warnings: List[WarningItem] = []
-
-    # slot_indices_by_member: member_id -> set of slot indices where they are assigned
     slot_indices_by_member: Dict[int, Set[int]] = {}
 
     for slot_idx, slot in enumerate(slots):
         asgns = assignments[slot_idx]
 
-        # W1 — créneau sans respo bar (soirée)
+        # W1
         if event.type == EventTypeEnum.soiree:
             if not any(a.asgn_type == "respo_bar" for a in asgns):
                 warnings.append(WarningItem(
                     type="no_respo_bar",
                     slot_id=slot.id,
-                    message=f"Créneau {slot.heure_debut.strftime('%H:%M')} : aucun respo bar",
+                    message=f"Creneau {slot.heure_debut.strftime('%H:%M')} : aucun respo bar (W1)",
                 ))
 
-        # W2 — créneau sous-staffé
+        # W2
         if len(asgns) < slot.max_personnes:
             warnings.append(WarningItem(
                 type="slot_understaffed",
                 slot_id=slot.id,
                 message=(
-                    f"Créneau {slot.heure_debut.strftime('%H:%M')} : "
-                    f"{len(asgns)}/{slot.max_personnes} personnes"
+                    f"Creneau {slot.heure_debut.strftime('%H:%M')} : "
+                    f"{len(asgns)}/{slot.max_personnes} personnes (W2)"
                 ),
             ))
 
-        # W3 — créneau sans bureau
-        has_bureau = any(
-            "bureau" in (member_map[a.member_id].roles or [])
-            for a in asgns if a.member_id in member_map
-        )
-        if asgns and not has_bureau:
+        # W3
+        if asgns and not _slot_has_bureau(asgns, member_map):
             warnings.append(WarningItem(
                 type="no_bureau",
                 slot_id=slot.id,
-                message=f"Créneau {slot.heure_debut.strftime('%H:%M')} : aucun membre bureau",
+                message=f"Creneau {slot.heure_debut.strftime('%H:%M')} : aucun membre bureau (W3)",
             ))
 
-        # W5 — maybe_force
+        # W5
         for a in asgns:
             if a.maybe_force:
                 m = member_map.get(a.member_id)
@@ -702,11 +733,11 @@ def _generate_warnings(
                     type="maybe_forced",
                     slot_id=slot.id,
                     member_id=a.member_id,
-                    message=f"Créneau {slot.heure_debut.strftime('%H:%M')} : {name} forcé (maybe)",
+                    message=f"Creneau {slot.heure_debut.strftime('%H:%M')} : {name} force (maybe) — W5",
                 ))
             slot_indices_by_member.setdefault(a.member_id, set()).add(slot_idx)
 
-    # W4 — membre au-delà de 2h (escalade)
+    # W4
     for member_id, palier in member_escalation_palier.items():
         total_h = len(slot_indices_by_member.get(member_id, set()))
         m = member_map.get(member_id)
@@ -714,12 +745,10 @@ def _generate_warnings(
         warnings.append(WarningItem(
             type="over_quota",
             member_id=member_id,
-            message=(
-                f"{name} : {total_h}h affectées (palier d'escalade {palier})"
-            ),
+            message=f"{name} : {total_h}h affectees (palier {palier}) — W4",
         ))
 
-    # W6 — affinité non satisfaite
+    # W6
     processed: Set[frozenset] = set()
     for a_id, b_id in affinity_set:
         pair = frozenset([a_id, b_id])
@@ -735,34 +764,100 @@ def _generate_warnings(
             name_b = f"{m_b.prenom} {m_b.nom}" if m_b else str(b_id)
             warnings.append(WarningItem(
                 type="affinity_unsatisfied",
-                message=f"Affinité non satisfaite : {name_a} & {name_b}",
+                message=f"Affinite non satisfaite : {name_a} & {name_b} — W6",
             ))
 
-    # W7 — pause de 2h utilisée (R3 priorité 2)
+    # W7 — pause >= 3h between blocks
     for member_id, slot_idxs in slot_indices_by_member.items():
-        sorted_idxs = sorted(slot_idxs)
-        # Find block boundaries
-        if len(sorted_idxs) < 2:
-            continue
-        # Detect blocks
-        blocks: List[List[int]] = [[sorted_idxs[0]]]
-        for idx in sorted_idxs[1:]:
-            if idx == blocks[-1][-1] + 1:
-                blocks[-1].append(idx)
-            else:
-                blocks.append([idx])
-        if len(blocks) < 2:
-            continue
-        for i in range(len(blocks) - 1):
-            gap = blocks[i + 1][0] - blocks[i][-1] - 1
-            if gap == 2:
+        ms_tmp = _MemberState(member_id)
+        for idx in sorted(slot_idxs):
+            ms_tmp.assign(idx)
+        blks = ms_tmp.blocks()
+        for i in range(len(blks) - 1):
+            gap = blks[i + 1][0] - blks[i][-1] - 1
+            if gap >= 3:
                 m = member_map.get(member_id)
                 name = f"{m.prenom} {m.nom}" if m else str(member_id)
-                slot_obj = None  # no single slot to attach
                 warnings.append(WarningItem(
                     type="long_pause",
                     member_id=member_id,
-                    message=f"{name} : pause de 2h entre deux blocs (R3 priorité 2)",
+                    message=f"{name} : pause de {gap}h entre deux blocs — W7",
                 ))
 
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Utility: manual assignment validation
+# ---------------------------------------------------------------------------
+
+
+def check_manual_assignment(
+    db: Session,
+    event_id: int,
+    membre_id: int,
+    creneau_id: int,
+) -> Optional[str]:
+    """
+    Validate R1/R5/R6 for a manual assignment.
+    Returns error string if violated, None if OK.
+    """
+    slot = db.query(Slot).filter(
+        Slot.id == creneau_id, Slot.evenement_id == event_id
+    ).first()
+    if not slot:
+        return "Creneau introuvable"
+
+    # R5
+    avail = db.query(Availability).filter(
+        Availability.evenement_id == event_id,
+        Availability.membre_id == membre_id,
+        Availability.creneau_id == creneau_id,
+    ).first()
+    if avail and avail.statut.value == "no":
+        return "R5 : ce membre est indisponible (statut 'no')"
+
+    # R6
+    already_there = db.query(Assignment).filter(
+        Assignment.creneau_id == creneau_id,
+        Assignment.membre_id == membre_id,
+    ).first()
+    if not already_there:
+        count = db.query(Assignment).filter(Assignment.creneau_id == creneau_id).count()
+        if count >= slot.max_personnes:
+            return f"R6 : creneau complet ({slot.max_personnes}/{slot.max_personnes})"
+
+    # R1
+    all_slots = sorted(
+        db.query(Slot).filter(Slot.evenement_id == event_id).all(),
+        key=lambda s: s.heure_debut,
+    )
+    slot_id_to_idx = {s.id: i for i, s in enumerate(all_slots)}
+    slot_idx = slot_id_to_idx.get(creneau_id)
+    if slot_idx is None:
+        return "Creneau introuvable dans l'evenement"
+
+    other_asgns = db.query(Assignment).filter(
+        Assignment.creneau_id.in_([s.id for s in all_slots]),
+        Assignment.membre_id == membre_id,
+        Assignment.creneau_id != creneau_id,
+    ).all()
+    assigned_indices: Set[int] = {
+        slot_id_to_idx[a.creneau_id]
+        for a in other_asgns
+        if a.creneau_id in slot_id_to_idx
+    }
+
+    run = 1
+    j = slot_idx - 1
+    while j in assigned_indices:
+        run += 1
+        j -= 1
+    j = slot_idx + 1
+    while j in assigned_indices:
+        run += 1
+        j += 1
+    if run > 2:
+        return "R1 : bloc de plus de 2h consecutives interdit"
+
+    return None

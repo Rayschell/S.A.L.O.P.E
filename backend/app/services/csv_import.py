@@ -14,9 +14,12 @@ from ..config import settings
 from ..models.models import (
     Availability,
     AvailabilityStatusEnum,
+    Event,
+    EventTypeEnum,
     Member,
     MemberAlias,
     Slot,
+    StatsMemberHeureRelative,
 )
 
 # Strawpoll CSV metadata columns (before the availability columns)
@@ -86,19 +89,12 @@ def import_csv(
 ) -> dict:
     """
     Parse Strawpoll CSV, create slots, resolve names, save availabilities.
-
-    Returns:
-        {
-            "imported_count": int,
-            "pending": [
-                {
-                    "csv_name": str,
-                    "suggestions": [{"member_id": int, "display_name": str, "score": float}],
-                    "availabilities": [{"slot_label": str, "statut": str}],
-                }
-            ]
-        }
+    Also increments fois_disponible for each yes/maybe availability.
     """
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise ValueError(f"Event {event_id} not found")
+    event_type = event.type
     text = csv_bytes.decode("utf-8-sig")
     df = pd.read_csv(io.StringIO(text), dtype=str, keep_default_na=False)
     df.columns = [c.strip() for c in df.columns]
@@ -131,6 +127,18 @@ def import_csv(
             db.flush()
         slot_label_to_id[label] = slot.id
 
+    # Recompute heure_relative for all slots of this event
+    all_event_slots = sorted(
+        db.query(Slot).filter(Slot.evenement_id == event_id).all(),
+        key=lambda s: s.heure_debut,
+    )
+    for hr_idx, ev_slot in enumerate(all_event_slots):
+        ev_slot.heure_relative = hr_idx
+    db.flush()
+
+    # Build slot_id -> heure_relative map
+    slot_id_to_hr: Dict[int, int] = {s.id: s.heure_relative for s in all_event_slots}
+
     # ------------------------------------------------------------------
     # 2. Resolve names
     # ------------------------------------------------------------------
@@ -160,7 +168,7 @@ def import_csv(
         if norm in alias_map:
             member_id = alias_map[norm]
             _save_alias_if_new(db, csv_name, member_id)
-            _save_availabilities(db, event_id, member_id, row_avails)
+            _save_availabilities(db, event_id, member_id, row_avails, slot_id_to_hr, event_type)
             imported_count += 1
             continue
 
@@ -169,9 +177,8 @@ def import_csv(
         if candidates and candidates[0][2] >= threshold:
             member_id = candidates[0][0]
             _save_alias_if_new(db, csv_name, member_id)
-            _save_availabilities(db, event_id, member_id, row_avails)
+            _save_availabilities(db, event_id, member_id, row_avails, slot_id_to_hr, event_type)
             imported_count += 1
-            # Update alias map so subsequent rows can find this alias
             alias_map[norm] = member_id
         else:
             # Return to frontend for manual resolution
@@ -261,7 +268,12 @@ def _save_alias_if_new(db: Session, csv_name: str, member_id: int) -> None:
 
 
 def _save_availabilities(
-    db: Session, event_id: int, member_id: int, row_avails: list
+    db: Session,
+    event_id: int,
+    member_id: int,
+    row_avails: list,
+    slot_id_to_hr: dict,
+    event_type,
 ) -> None:
     for item in row_avails:
         slot_id = item["slot_id"]
@@ -288,6 +300,29 @@ def _save_availabilities(
                     statut=AvailabilityStatusEnum(statut_str),
                 )
             )
+        # Increment fois_disponible for yes/maybe
+        if statut_str in ("yes", "maybe"):
+            hr = slot_id_to_hr.get(slot_id)
+            if hr is not None:
+                stat = (
+                    db.query(StatsMemberHeureRelative)
+                    .filter_by(
+                        membre_id=member_id,
+                        type_evenement=event_type,
+                        heure_relative=hr,
+                    )
+                    .first()
+                )
+                if stat:
+                    stat.fois_disponible += 1
+                else:
+                    db.add(StatsMemberHeureRelative(
+                        membre_id=member_id,
+                        type_evenement=event_type,
+                        heure_relative=hr,
+                        fois_disponible=1,
+                        fois_staffe=0,
+                    ))
 
 
 def get_slot_label_map(db: Session, event_id: int) -> Dict[str, int]:

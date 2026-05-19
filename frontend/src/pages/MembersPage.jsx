@@ -3,6 +3,7 @@ import { membersApi } from '../api/members.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import MemberForm from '../components/members/MemberForm.jsx'
 import MemberTable from '../components/members/MemberTable.jsx'
+import MemberStats from '../components/members/MemberStats.jsx'
 
 export default function MembersPage() {
   const { user } = useAuth()
@@ -12,6 +13,8 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [statsModal, setStatsModal] = useState(null)   // { member, stats }
+  const [statsLoading, setStatsLoading] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -42,6 +45,19 @@ export default function MembersPage() {
     setShowForm(false)
     setEditing(null)
     load()
+  }
+
+  const handleShowStats = async (m) => {
+    setStatsModal({ member: m, stats: null })
+    setStatsLoading(true)
+    try {
+      const stats = await membersApi.getStats(m.id)
+      setStatsModal({ member: m, stats })
+    } catch {
+      setStatsModal({ member: m, stats: { afterwork: [], soiree: [] } })
+    } finally {
+      setStatsLoading(false)
+    }
   }
 
   return (
@@ -75,6 +91,7 @@ export default function MembersPage() {
           onEdit={(m) => { setEditing(m); setShowForm(true) }}
           onDelete={handleDelete}
           onResetCounters={handleResetCounters}
+          onStats={handleShowStats}
         />
       )}
 
@@ -86,6 +103,28 @@ export default function MembersPage() {
               onSaved={handleSaved}
               onCancel={() => { setShowForm(false); setEditing(null) }}
             />
+          </div>
+        </div>
+      )}
+
+      {statsModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Stats — {statsModal.member.prenom} {statsModal.member.nom}
+              </h2>
+              <button
+                onClick={() => setStatsModal(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            {statsLoading
+              ? <p className="text-gray-400 text-sm">Chargement…</p>
+              : <MemberStats stats={statsModal.stats} />
+            }
           </div>
         </div>
       )}
