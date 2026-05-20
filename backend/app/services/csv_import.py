@@ -220,6 +220,14 @@ def resolve_pending(
     resolutions: list of {csv_name, member_id?, create_new, availabilities}
     Returns count of newly imported rows.
     """
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise ValueError(f"Event {event_id} not found")
+    event_type = event.type
+
+    all_event_slots = db.query(Slot).filter(Slot.evenement_id == event_id).all()
+    slot_id_to_hr: Dict[int, int] = {s.id: s.heure_relative for s in all_event_slots}
+
     imported = 0
     for entry in resolutions:
         csv_name = entry["csv_name"]
@@ -249,7 +257,7 @@ def resolve_pending(
                 continue
 
         _save_alias_if_new(db, csv_name, member_id)
-        _save_availabilities(db, event_id, member_id, row_avails)
+        _save_availabilities(db, event_id, member_id, row_avails, slot_id_to_hr, event_type)
         imported += 1
 
     db.commit()

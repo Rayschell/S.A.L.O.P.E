@@ -13,3 +13,4 @@ pandas==2.2.2
 python-dotenv==1.0.1
 pydantic[email]==2.7.1
 pydantic-settings==2.2.1
+ortools==9.10.4067
