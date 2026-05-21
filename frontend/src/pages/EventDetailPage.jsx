@@ -33,6 +33,7 @@ export default function EventDetailPage() {
   const [assignments, setAssignments] = useState([])
   const [affinities, setAffinities] = useState([])
   const [resposBar, setResposBar] = useState([])
+  const [availabilities, setAvailabilities] = useState([])
   const [warnings, setWarnings] = useState([])
   const [tab, setTab] = useState('import')
   const [generating, setGenerating] = useState(false)
@@ -40,13 +41,14 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true)
 
   const reload = async () => {
-    const [ev, sl, asgn, aff, rb, mem] = await Promise.all([
+    const [ev, sl, asgn, aff, rb, mem, avs] = await Promise.all([
       eventsApi.get(id),
       eventsApi.listSlots(id),
       eventsApi.listAssignments(id),
       eventsApi.listAffinities(id),
       eventsApi.listResposBar(id),
       membersApi.list(),
+      eventsApi.listAvailabilities(id),
     ])
     setEvent(ev)
     setSlots(sl.sort((a, b) => new Date(a.heure_debut) - new Date(b.heure_debut)))
@@ -54,6 +56,7 @@ export default function EventDetailPage() {
     setAffinities(aff)
     setResposBar(rb)
     setMembers(mem)
+    setAvailabilities(avs)
     setLoading(false)
   }
 
@@ -216,6 +219,7 @@ export default function EventDetailPage() {
             members={members}
             assignments={assignments}
             affinities={affinities}
+            availabilities={availabilities}
             onAssignmentChange={(newAsgns) => setAssignments(newAsgns)}
             eventId={id}
             disabled={!isBureau || isPublished}

@@ -425,6 +425,20 @@ def delete_assignment(
     db.commit()
 
 
+@router.get("/{event_id}/availabilities")
+def list_availabilities(
+    event_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    _get_event_or_404(db, event_id)
+    slot_ids = [s.id for s in db.query(Slot).filter(Slot.evenement_id == event_id).all()]
+    if not slot_ids:
+        return []
+    avs = db.query(Availability).filter(Availability.creneau_id.in_(slot_ids)).all()
+    return [{"membre_id": a.membre_id, "creneau_id": a.creneau_id, "statut": a.statut} for a in avs]
+
+
 # ---------------------------------------------------------------------------
 # Schedule generation
 # ---------------------------------------------------------------------------

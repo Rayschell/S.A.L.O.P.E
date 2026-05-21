@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { membersApi } from '../api/members.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import MemberForm from '../components/members/MemberForm.jsx'
@@ -16,6 +16,14 @@ export default function MembersPage() {
   const [editing, setEditing] = useState(null)
   const [statsModal, setStatsModal] = useState(null)   // { member, stats }
   const [statsLoading, setStatsLoading] = useState(false)
+  const statsPanelRef = useRef(null)
+
+  useEffect(() => {
+    if (!statsModal) return
+    const onKey = (e) => { if (e.key === 'Escape') setStatsModal(null) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [statsModal])
 
   const load = () => {
     setLoading(true)
@@ -42,6 +50,11 @@ export default function MembersPage() {
     load()
   }
 
+  const handleRoleChange = async (id, newRoles) => {
+    await membersApi.update(id, { roles: newRoles })
+    load()
+  }
+
   const handleSaved = () => {
     setShowForm(false)
     setEditing(null)
@@ -49,13 +62,16 @@ export default function MembersPage() {
   }
 
   const handleShowStats = async (m) => {
-    setStatsModal({ member: m, stats: null })
+    setStatsModal({ member: m, stats: null, timeline: null })
     setStatsLoading(true)
     try {
-      const stats = await membersApi.getStats(m.id)
-      setStatsModal({ member: m, stats })
+      const [stats, timeline] = await Promise.all([
+        membersApi.getStats(m.id),
+        membersApi.getTimeline(m.id),
+      ])
+      setStatsModal({ member: m, stats, timeline })
     } catch {
-      setStatsModal({ member: m, stats: { afterwork: [], soiree: [] } })
+      setStatsModal({ member: m, stats: { afterwork: [], soiree: [] }, timeline: [] })
     } finally {
       setStatsLoading(false)
     }
@@ -63,13 +79,11 @@ export default function MembersPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <IconUsers size={16} stroke={1.5} color="var(--text-muted)" />
-          <h1 style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Membres</h1>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <IconUsers size={16} stroke={1.5} color="var(--text-muted)" />
+        <h1 style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Membres</h1>
         {isBureau && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <>
             <button onClick={handleResetAll} style={btnGhostStyle}>
               <IconRefresh size={12} stroke={1.5} />
               Réinit. compteurs
@@ -78,7 +92,7 @@ export default function MembersPage() {
               <IconPlus size={12} stroke={1.5} />
               Ajouter un membre
             </button>
-          </div>
+          </>
         )}
       </div>
 
@@ -92,6 +106,7 @@ export default function MembersPage() {
           onDelete={handleDelete}
           onResetCounters={handleResetCounters}
           onStats={handleShowStats}
+          onRoleChange={handleRoleChange}
         />
       )}
 
@@ -108,8 +123,8 @@ export default function MembersPage() {
       )}
 
       {statsModal && (
-        <div style={overlayStyle}>
-          <div style={{ ...panelStyle, maxWidth: 540 }}>
+        <div style={overlayStyle} onMouseDown={(e) => { if (e.target === e.currentTarget) setStatsModal(null) }}>
+          <div ref={statsPanelRef} style={{ ...panelStyle, maxWidth: 540 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
               <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
                 Stats — {statsModal.member.prenom} {statsModal.member.nom}
@@ -123,7 +138,13 @@ export default function MembersPage() {
             </div>
             {statsLoading
               ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
-              : <MemberStats stats={statsModal.stats} />
+              : <MemberStats
+                  stats={statsModal.stats}
+                  respoBar={statsModal.member?.shifts_respo_bar_cumules}
+                  maxRespoBar={Math.max(...members.filter(m => m.roles?.includes('bureau')).map(m => m.shifts_respo_bar_cumules || 0), 1)}
+                  isMemberBureau={statsModal.member?.roles?.includes('bureau')}
+                  timeline={statsModal.timeline}
+                />
             }
           </div>
         </div>

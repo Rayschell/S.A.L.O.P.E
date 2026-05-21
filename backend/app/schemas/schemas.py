@@ -317,3 +317,26 @@ class MemberStatsEntry(BaseModel):
 class MemberStatsRead(BaseModel):
     afterwork: List[MemberStatsEntry] = []
     soiree: List[MemberStatsEntry] = []
+    afterwork_slot_labels: dict = {}  # heure_relative -> "HH:MM"
+    soiree_slot_labels: dict = {}
+
+
+# ---------------------------------------------------------------------------
+# Member timeline
+# ---------------------------------------------------------------------------
+
+
+class TimelineSlot(BaseModel):
+    heure_debut: datetime
+    heure_fin: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TimelineEvent(BaseModel):
+    event_id: int
+    nom: str
+    date: datetime
+    type: str
+    slots: List[TimelineSlot]
+    total_heures: float

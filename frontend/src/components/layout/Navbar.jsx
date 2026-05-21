@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
-import { IconGlassFull, IconUser, IconMenu2 } from '@tabler/icons-react'
+import { IconUser, IconMenu2, IconSun, IconMoon } from '@tabler/icons-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
+import { useTheme } from '../../contexts/ThemeContext.jsx'
 
 const NAV_LINKS = [
   { to: '/events', label: 'Événements' },
@@ -10,6 +11,7 @@ const NAV_LINKS = [
 export default function Navbar({ onToggleSidebar }) {
   const location = useLocation()
   const { user } = useAuth()
+  const { theme, toggle: toggleTheme } = useTheme()
 
   return (
     <nav
@@ -42,20 +44,11 @@ export default function Navbar({ onToggleSidebar }) {
           <IconMenu2 size={15} stroke={1.5} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              width: 20,
-              height: 20,
-              background: 'var(--violet)',
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <IconGlassFull size={11} color="#fff" stroke={1.8} />
-          </div>
+          <img
+            src="/lateb_logo.svg"
+            alt="Logo"
+            style={{ width: 42, height: 42, flexShrink: 0 }}
+          />
           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
             S.A.L.O.P.E
           </span>
@@ -86,21 +79,38 @@ export default function Navbar({ onToggleSidebar }) {
         })}
       </div>
 
-      {/* Avatar */}
-      <div
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: '50%',
-          background: 'var(--bg-high)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'default',
-        }}
-        title={user?.email || ''}
-      >
-        <IconUser size={12} color="var(--text-secondary)" stroke={1.5} />
+      {/* Avatar + theme toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          onClick={toggleTheme}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 30, height: 30, borderRadius: 6,
+            background: 'transparent', border: 'none',
+            cursor: 'pointer', color: 'var(--text-muted)',
+            transition: 'background 120ms ease',
+          }}
+          title={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-high)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+        >
+          {theme === 'dark' ? <IconSun size={16} stroke={1.5} /> : <IconMoon size={16} stroke={1.5} />}
+        </button>
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            background: 'var(--bg-high)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'default',
+          }}
+          title={user?.email || ''}
+        >
+          <IconUser size={13} color="var(--text-secondary)" stroke={1.5} />
+        </div>
       </div>
     </nav>
   )

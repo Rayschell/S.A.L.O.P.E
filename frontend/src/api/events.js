@@ -46,6 +46,9 @@ export const eventsApi = {
   deleteAssignment: (eventId, asgId) =>
     client.delete(`/events/${eventId}/assignments/${asgId}`),
 
+  // Availabilities
+  listAvailabilities: (id) => client.get(`/events/${id}/availabilities`).then((r) => r.data),
+
   // Generate
   generate: (id) => client.post(`/events/${id}/generate`).then((r) => r.data),
 

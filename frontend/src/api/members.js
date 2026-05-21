@@ -9,4 +9,5 @@ export const membersApi = {
   resetCounters: (id) => client.post(`/members/${id}/reset-counters`).then((r) => r.data),
   resetAllCounters: () => client.post('/members/reset-all-counters'),
   getStats: (id) => client.get(`/members/${id}/stats`).then((r) => r.data),
+  getTimeline: (id) => client.get(`/members/${id}/timeline`).then((r) => r.data),
 }

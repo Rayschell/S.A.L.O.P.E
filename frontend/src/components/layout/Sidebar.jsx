@@ -54,17 +54,17 @@ export default function Sidebar() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
-                  padding: '7px 8px',
+                  gap: 10,
+                  padding: '8px 10px',
                   borderRadius: 6,
-                  fontSize: 13,
+                  fontSize: 15,
                   textDecoration: 'none',
                   color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                   background: active ? 'var(--bg-high)' : 'transparent',
                   transition: 'background 120ms ease, color 120ms ease',
                 }}
               >
-                <Icon size={14} stroke={1.5} />
+                <Icon size={16} stroke={1.5} />
                 {label}
               </Link>
             )
@@ -79,10 +79,10 @@ export default function Sidebar() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          padding: '7px 8px',
+          gap: 10,
+          padding: '8px 10px',
           borderRadius: 6,
-          fontSize: 13,
+          fontSize: 15,
           background: 'transparent',
           color: 'var(--text-muted)',
           border: 'none',
@@ -95,7 +95,7 @@ export default function Sidebar() {
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)' }}
       >
-        <IconLogout size={14} stroke={1.5} />
+        <IconLogout size={16} stroke={1.5} />
         Déconnexion
       </button>
     </aside>

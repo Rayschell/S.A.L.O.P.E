@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { eventsApi } from '../../api/events.js'
 import '../../styles/planning.css'
 
@@ -8,6 +8,7 @@ export default function PlanningGrid({
   members,
   assignments,
   affinities,
+  availabilities = [],
   onAssignmentChange,
   eventId,
   disabled,
@@ -15,6 +16,18 @@ export default function PlanningGrid({
   const [editCell, setEditCell] = useState(null)
   const [cellLoading, setCellLoading] = useState(null)
   const [cellError, setCellError] = useState(null)
+
+  // Auto-dismiss error after 3.5s
+  useEffect(() => {
+    if (!cellError) return
+    const t = setTimeout(() => setCellError(null), 3500)
+    return () => clearTimeout(t)
+  }, [cellError])
+
+  // Build a set of (membre_id, creneau_id) where statut = 'no'
+  const noDispoSet = new Set(
+    availabilities.filter((a) => a.statut === 'no').map((a) => `${a.membre_id}-${a.creneau_id}`)
+  )
 
   const asgMap = {}
   for (const a of assignments) {
@@ -68,6 +81,13 @@ export default function PlanningGrid({
 
   const handleCellClick = (memberId, slotId) => {
     if (disabled) return
+    setCellError(null)
+    const key = `${memberId}-${slotId}`
+    // Block adding an assignment if member is explicitly unavailable
+    if (!asgMap[key] && noDispoSet.has(key)) {
+      setCellError({ memberId, slotId, message: 'Ce membre est indisponible sur ce créneau' })
+      return
+    }
     setEditCell({ memberId, slotId })
   }
 

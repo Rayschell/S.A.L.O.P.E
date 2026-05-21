@@ -9,7 +9,7 @@
 .planning-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .planning-table thead th {
@@ -17,7 +17,7 @@
   color: #fff;
   font-weight: 500;
   font-size: 12px;
-  padding: 9px 10px;
+  padding: 7px 12px;
   text-align: center;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   white-space: nowrap;
@@ -31,7 +31,7 @@
 .planning-table thead th:last-child { border-right: none; }
 
 .planning-table tbody td {
-  padding: 7px 10px;
+  padding: 5px 10px;
   text-align: center;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
