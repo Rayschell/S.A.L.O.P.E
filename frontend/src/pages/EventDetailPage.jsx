@@ -9,6 +9,8 @@ import AffinityConfig from '../components/events/AffinityConfig.jsx'
 import SlotConfig from '../components/events/SlotConfig.jsx'
 import PlanningGrid from '../components/planning/PlanningGrid.jsx'
 import WarningsList from '../components/planning/WarningsList.jsx'
+import Badge from '../components/ui/Badge.jsx'
+import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload } from '@tabler/icons-react'
 
 const TABS = ['import', 'config', 'respos', 'affinites', 'planning']
 const TAB_LABELS = {
@@ -81,73 +83,97 @@ export default function EventDetailPage() {
   }
 
   if (loading) {
-    return <p className="text-gray-500">Chargement…</p>
+    return <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
   }
+
+  const isPublished = event.statut === 'publie'
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
         <div>
           <button
             onClick={() => navigate('/events')}
-            className="text-sm text-blue-600 hover:underline mb-1"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              marginBottom: 8,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
-            ← Retour
+            <IconArrowLeft size={13} stroke={1.5} />
+            Retour
           </button>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {event.nom}
-            <span className="ml-3 text-base font-normal text-gray-500">
-              {new Date(event.date).toLocaleDateString('fr-FR', {
-                day: 'numeric', month: 'long', year: 'numeric',
-              })}
-            </span>
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Type : <strong>{event.type === 'soiree' ? 'Soirée' : 'Afterwork'}</strong>
-            {' · '}Statut : <strong>{event.statut === 'publie' ? '✅ Publié' : '📝 Brouillon'}</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>{event.nom}</h1>
+            <Badge variant={isPublished ? 'green' : 'amber'}>
+              {isPublished ? 'Publié' : 'Brouillon'}
+            </Badge>
+            <Badge variant="default">{event.type === 'soiree' ? 'Soirée' : 'Afterwork'}</Badge>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            {new Date(event.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
         {isBureau && (
-          <div className="flex gap-2">
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
             <button
               onClick={handleGenerate}
-              disabled={generating || event.statut === 'publie'}
-              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50"
+              disabled={generating || isPublished}
+              style={{ ...actionBtnStyle('var(--accent)'), opacity: generating || isPublished ? 0.5 : 1, cursor: generating || isPublished ? 'not-allowed' : 'pointer' }}
             >
-              {generating ? 'Génération…' : '⚙ Générer le planning'}
+              <IconPlayerPlay size={13} stroke={1.5} />
+              {generating ? 'Génération…' : 'Générer'}
             </button>
-            {event.statut === 'brouillon' && (
+            {!isPublished && (
               <button
                 onClick={handlePublish}
                 disabled={publishing}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50"
+                style={{ ...actionBtnStyle('var(--green)'), opacity: publishing ? 0.5 : 1, cursor: publishing ? 'not-allowed' : 'pointer' }}
               >
-                {publishing ? 'Publication…' : '✓ Valider & publier'}
+                <IconCheck size={13} stroke={1.5} />
+                {publishing ? 'Publication…' : 'Valider & publier'}
               </button>
             )}
             <a
               href={eventsApi.exportPngUrl(id)}
               download={`planning-${id}.png`}
-              className="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+              style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), textDecoration: 'none' }}
             >
-              ↓ Export PNG
+              <IconDownload size={13} stroke={1.5} />
+              Export PNG
             </a>
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, overflowX: 'auto' }}>
         {TABS.filter((t) => t !== 'respos' || event.type === 'soiree').map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              tab === t
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            style={{
+              padding: '8px 16px',
+              fontSize: 14,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              color: tab === t ? 'var(--text-primary)' : 'var(--text-muted)',
+              borderBottom: tab === t ? '2px solid var(--violet)' : '2px solid transparent',
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: tab === t ? 500 : 400,
+              transition: 'color 120ms ease',
+              marginBottom: -1,
+            }}
           >
             {TAB_LABELS[t]}
           </button>
@@ -156,44 +182,31 @@ export default function EventDetailPage() {
 
       {/* Tab content */}
       {tab === 'import' && (
-        <CsvImport
-          eventId={id}
-          onImported={reload}
-          disabled={!isBureau || event.statut === 'publie'}
-        />
+        <CsvImport eventId={id} onImported={reload} disabled={!isBureau || isPublished} />
       )}
-
       {tab === 'config' && (
-        <SlotConfig
-          slots={slots}
-          eventId={id}
-          onSaved={reload}
-          disabled={!isBureau || event.statut === 'publie'}
-        />
+        <SlotConfig slots={slots} eventId={id} onSaved={reload} disabled={!isBureau || isPublished} />
       )}
-
       {tab === 'respos' && (
         <RespoBarConfig
           eventId={id}
           members={members}
           resposBar={resposBar}
           onSaved={(rb) => setResposBar(rb)}
-          disabled={!isBureau || event.statut === 'publie'}
+          disabled={!isBureau || isPublished}
         />
       )}
-
       {tab === 'affinites' && (
         <AffinityConfig
           eventId={id}
           members={members}
           affinities={affinities}
           onChanged={reload}
-          disabled={!isBureau || event.statut === 'publie'}
+          disabled={!isBureau || isPublished}
         />
       )}
-
       {tab === 'planning' && (
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {warnings.length > 0 && (
             <WarningsList warnings={warnings} slots={slots} members={members} />
           )}
@@ -205,10 +218,26 @@ export default function EventDetailPage() {
             affinities={affinities}
             onAssignmentChange={(newAsgns) => setAssignments(newAsgns)}
             eventId={id}
-            disabled={!isBureau || event.statut === 'publie'}
+            disabled={!isBureau || isPublished}
           />
         </div>
       )}
     </div>
   )
 }
+
+const actionBtnStyle = (bg, color = '#fff', border = 'none') => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: bg,
+  color,
+  border,
+  borderRadius: 'var(--radius-sm)',
+  padding: '8px 14px',
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+  transition: 'opacity 120ms ease',
+})

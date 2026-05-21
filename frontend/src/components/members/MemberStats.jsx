@@ -1,27 +1,20 @@
-/**
- * MemberStats — shows two bar chart histograms (afterwork / soirée)
- * X axis: heure_relative (0-based slot index)
- * Each bar has two layers:
- *   - grey background bar = fois_disponible
- *   - coloured foreground bar = fois_staffe
- */
 export default function MemberStats({ stats }) {
-  if (!stats) return <p className="text-gray-400 text-sm">Chargement…</p>
+  if (!stats) return <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
 
   return (
-    <div className="space-y-6">
-      <Histogram title="Afterwork" entries={stats.afterwork} color="#3b82f6" />
-      <Histogram title="Soirée" entries={stats.soiree} color="#8b5cf6" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <Histogram title="Afterwork" entries={stats.afterwork} color="var(--accent)" colorRaw="#2563c4" />
+      <Histogram title="Soirée" entries={stats.soiree} color="var(--violet)" colorRaw="#7c6af7" />
     </div>
   )
 }
 
-function Histogram({ title, entries, color }) {
+function Histogram({ title, entries, colorRaw }) {
   if (!entries || entries.length === 0) {
     return (
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-1">{title}</h3>
-        <p className="text-xs text-gray-400">Aucune donnée</p>
+        <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>{title}</p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Aucune donnée</p>
       </div>
     )
   }
@@ -30,50 +23,58 @@ function Histogram({ title, entries, color }) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">{title}</h3>
-      <div className="flex items-end gap-2 h-32">
+      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 10 }}>{title}</p>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
         {entries.map((e) => {
-          const barHeight = Math.round((e.fois_disponible / maxDispo) * 100)
-          const fillHeight = e.fois_disponible > 0
-            ? Math.round((e.fois_staffe / e.fois_disponible) * barHeight)
+          const barH = Math.round((e.fois_disponible / maxDispo) * 100)
+          const fillH = e.fois_disponible > 0
+            ? Math.round((e.fois_staffe / e.fois_disponible) * barH)
             : 0
 
           return (
-            <div key={e.heure_relative} className="flex flex-col items-center flex-1 min-w-0">
-              <div className="relative w-full flex flex-col justify-end" style={{ height: '100px' }}>
-                {/* Background bar (fois_disponible) */}
+            <div key={e.heure_relative} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 0 }}>
+              <div style={{ position: 'relative', width: '100%', height: 64, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                {/* Dispo background */}
                 <div
-                  className="absolute bottom-0 w-full rounded-t"
                   style={{
-                    height: `${barHeight}%`,
-                    backgroundColor: color,
-                    opacity: 0.2,
+                    position: 'absolute',
+                    bottom: 0,
+                    width: '100%',
+                    height: `${barH}%`,
+                    background: colorRaw,
+                    opacity: 0.15,
+                    borderRadius: '3px 3px 0 0',
                   }}
                 />
-                {/* Foreground bar (fois_staffe) */}
+                {/* Staffé foreground */}
                 <div
-                  className="absolute bottom-0 w-full rounded-t"
                   style={{
-                    height: `${fillHeight}%`,
-                    backgroundColor: color,
-                    opacity: 0.9,
+                    position: 'absolute',
+                    bottom: 0,
+                    width: '100%',
+                    height: `${fillH}%`,
+                    background: colorRaw,
+                    opacity: 0.85,
+                    borderRadius: '3px 3px 0 0',
                   }}
                 />
               </div>
-              <span className="text-xs text-gray-500 mt-1">H{e.heure_relative}</span>
+              <span style={{ fontSize: 10, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)', marginTop: 4 }}>
+                H{e.heure_relative}
+              </span>
             </div>
           )
         })}
       </div>
-      <div className="flex gap-4 mt-2 text-xs text-gray-500">
-        <span>
-          <span className="inline-block w-3 h-3 rounded mr-1 align-middle" style={{ backgroundColor: color, opacity: 0.2 }} />
+      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: colorRaw, opacity: 0.15 }} />
           Disponible
-        </span>
-        <span>
-          <span className="inline-block w-3 h-3 rounded mr-1 align-middle" style={{ backgroundColor: color, opacity: 0.9 }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: colorRaw, opacity: 0.85 }} />
           Staffé
-        </span>
+        </div>
       </div>
     </div>
   )

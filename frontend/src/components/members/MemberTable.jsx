@@ -1,76 +1,81 @@
-const ROLE_LABELS = { staff: 'Staff', bureau: 'Bureau' }
-const ROLE_COLORS = {
-  staff: 'bg-gray-100 text-gray-700',
-  bureau: 'bg-blue-100 text-blue-800',
-}
+import Badge from '../ui/Badge.jsx'
+import '../../styles/planning.css'
 
 export default function MemberTable({ members, isBureau, onEdit, onDelete, onResetCounters, onStats }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
-      <table className="min-w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
-          <tr>
-            <th className="px-4 py-3 text-left">Nom</th>
-            <th className="px-4 py-3 text-left">Email</th>
-            <th className="px-4 py-3 text-left">Rôles</th>
-            <th className="px-4 py-3 text-right">Respo bar</th>
-            <th className="px-4 py-3 text-right">Stats</th>
-            {isBureau && <th className="px-4 py-3 text-right">Actions</th>}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {members.map((m) => (
-            <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3 font-medium text-gray-800">
-                {m.prenom} {m.nom}
-              </td>
-              <td className="px-4 py-3 text-gray-500">{m.email || '—'}</td>
-              <td className="px-4 py-3">
-                <div className="flex gap-1 flex-wrap">
-                  {(m.roles || []).map((r) => (
-                    <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[r] || 'bg-gray-100 text-gray-600'}`}>
-                      {ROLE_LABELS[r] || r}
-                    </span>
-                  ))}
-                </div>
-              </td>
-              <td className="px-4 py-3 text-right tabular-nums">{m.shifts_respo_bar_cumules}</td>
-              <td className="px-4 py-3 text-right">
-                <button
-                  onClick={() => onStats(m)}
-                  className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100"
-                >
-                  Voir stats
-                </button>
-              </td>
-              {isBureau && (
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => onEdit(m)}
-                      className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      onClick={() => onResetCounters(m.id)}
-                      className="text-xs px-2 py-1 rounded bg-orange-50 text-orange-700 hover:bg-orange-100"
-                    >
-                      Réinit.
-                    </button>
-                    <button
-                      onClick={() => onDelete(m.id)}
-                      className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"
-                    >
-                      Suppr.
-                    </button>
+    <div className="planning-wrapper">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="planning-table">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th style={{ textAlign: 'left' }}>Email</th>
+              <th style={{ textAlign: 'left' }}>Rôles</th>
+              <th>Respo bar</th>
+              <th>Stats</th>
+              {isBureau && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((m) => (
+              <tr key={m.id}>
+                <td style={{ textAlign: 'left', fontWeight: 500 }}>
+                  {m.prenom} {m.nom}
+                </td>
+                <td style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
+                  {m.email || '—'}
+                </td>
+                <td style={{ textAlign: 'left' }}>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {(m.roles || []).map((r) => (
+                      <Badge key={r} variant={r === 'bureau' ? 'violet' : 'default'}>
+                        {r === 'staff' ? 'Staff' : 'Bureau'}
+                      </Badge>
+                    ))}
                   </div>
                 </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>
+                  {m.shifts_respo_bar_cumules}
+                </td>
+                <td>
+                  <button
+                    onClick={() => onStats(m)}
+                    style={actionBtn('var(--violet-soft)', 'var(--violet)')}
+                  >
+                    Voir stats
+                  </button>
+                </td>
+                {isBureau && (
+                  <td>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
+                      <button onClick={() => onEdit(m)} style={actionBtn('var(--accent-soft)', 'var(--accent)')}>
+                        Modifier
+                      </button>
+                      <button onClick={() => onResetCounters(m.id)} style={actionBtn('var(--amber-soft)', 'var(--amber)')}>
+                        Réinit.
+                      </button>
+                      <button onClick={() => onDelete(m.id)} style={actionBtn('var(--red-soft)', 'var(--red)')}>
+                        Suppr.
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
+
+const actionBtn = (bg, color) => ({
+  padding: '3px 8px',
+  fontSize: 11,
+  background: bg,
+  color,
+  border: 'none',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+})

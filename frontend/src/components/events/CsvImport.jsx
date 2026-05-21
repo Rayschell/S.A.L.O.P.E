@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { eventsApi } from '../../api/events.js'
 import NameResolutionModal from './NameResolutionModal.jsx'
+import { IconUpload } from '@tabler/icons-react'
 
 export default function CsvImport({ eventId, onImported, disabled }) {
   const [file, setFile] = useState(null)
@@ -22,7 +23,7 @@ export default function CsvImport({ eventId, onImported, disabled }) {
         onImported()
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erreur lors de l\'import.')
+      setError(err.response?.data?.detail || "Erreur lors de l'import.")
     } finally {
       setUploading(false)
     }
@@ -37,39 +38,91 @@ export default function CsvImport({ eventId, onImported, disabled }) {
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-700">Import CSV Strawpoll</h2>
-      <p className="text-sm text-gray-500">
-        Importez un export CSV de meeting poll Strawpoll. Les noms seront automatiquement résolus
-        via les alias connus (fuzzy matching). Les cas ambigus seront soumis à validation manuelle.
-      </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          Importez un export CSV de meeting poll Strawpoll. Les noms seront automatiquement résolus
+          via les alias connus (fuzzy matching). Les cas ambigus seront soumis à validation manuelle.
+        </p>
+      </div>
 
-      <div className="flex items-center gap-3">
-        <input
-          type="file"
-          accept=".csv"
-          disabled={disabled}
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:text-sm file:bg-white file:cursor-pointer"
-        />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '7px 12px',
+            fontSize: 12,
+            background: 'var(--bg-high)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            color: 'var(--text-secondary)',
+            fontFamily: "'DM Sans', sans-serif",
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          <input
+            type="file"
+            accept=".csv"
+            disabled={disabled}
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            style={{ display: 'none' }}
+          />
+          {file ? file.name : 'Choisir un fichier…'}
+        </label>
         <button
           onClick={handleUpload}
           disabled={!file || uploading || disabled}
-          className="px-4 py-2 text-sm bg-blue-700 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '7px 14px',
+            fontSize: 12,
+            background: 'var(--violet)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius-sm)',
+            cursor: !file || uploading || disabled ? 'not-allowed' : 'pointer',
+            opacity: !file || uploading || disabled ? 0.5 : 1,
+            fontWeight: 500,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
         >
+          <IconUpload size={11} stroke={1.5} />
           {uploading ? 'Import…' : 'Importer'}
         </button>
       </div>
 
       {error && (
-        <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div
+          style={{
+            background: 'var(--red-soft)',
+            border: '1px solid rgba(240, 82, 82, 0.2)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 12px',
+            fontSize: 12,
+            color: 'var(--red)',
+          }}
+        >
           {error}
-        </p>
+        </div>
       )}
 
       {result && !pendingData && (
-        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
-          ✅ {result.imported_count} ligne(s) importée(s) avec succès.
+        <div
+          style={{
+            background: 'var(--green-soft)',
+            border: '1px solid rgba(52, 199, 123, 0.2)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 12px',
+            fontSize: 12,
+            color: 'var(--green)',
+          }}
+        >
+          {result.imported_count} ligne(s) importée(s) avec succès.
         </div>
       )}
 

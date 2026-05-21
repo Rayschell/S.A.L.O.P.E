@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventsApi } from '../../api/events.js'
+import { IconHeart, IconTrash, IconPlus } from '@tabler/icons-react'
 
 export default function AffinityConfig({ eventId, members, affinities, onChanged, disabled }) {
   const [memberAId, setMemberAId] = useState('')
@@ -34,31 +35,54 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-700">Contraintes d'affinité</h2>
-      <p className="text-sm text-gray-500">
-        Indiquez les paires de membres qui souhaitent être sur le même créneau. Utilisé en
-        critère de départage lors de la génération.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+        Indiquez les paires de membres qui souhaitent être sur le même créneau.
+        Utilisé en critère de départage lors de la génération.
       </p>
 
       {/* Existing affinities */}
-      <div className="space-y-2">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {affinities.length === 0 && (
-          <p className="text-sm text-gray-400 italic">Aucune contrainte d'affinité définie.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Aucune contrainte d'affinité définie.
+          </p>
         )}
         {affinities.map((aff) => (
           <div
             key={aff.id}
-            className="flex items-center gap-3 bg-white border border-purple-100 rounded-lg px-4 py-2.5"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              background: 'var(--violet-soft)',
+              border: '1px solid rgba(124, 106, 247, 0.15)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '8px 12px',
+            }}
           >
-            <span className="flex-1 text-sm text-gray-800">
-              💜 {getName(aff.membre_a_id)} &amp; {getName(aff.membre_b_id)}
+            <IconHeart size={12} stroke={1.5} color="var(--violet)" />
+            <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+              {getName(aff.membre_a_id)} &amp; {getName(aff.membre_b_id)}
             </span>
             {!disabled && (
               <button
                 onClick={() => handleDelete(aff.id)}
-                className="px-2 py-0.5 text-xs rounded bg-red-50 text-red-600 hover:bg-red-100"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '3px 8px',
+                  fontSize: 11,
+                  background: 'var(--red-soft)',
+                  color: 'var(--red)',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
               >
+                <IconTrash size={10} stroke={1.5} />
                 Supprimer
               </button>
             )}
@@ -68,47 +92,74 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
 
       {/* Add affinity */}
       {!disabled && (
-        <div className="flex items-end gap-3 flex-wrap">
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">Membre A</label>
-            <select
-              value={memberAId}
-              onChange={(e) => setMemberAId(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
+            <label style={labelStyle}>Membre A</label>
+            <select value={memberAId} onChange={(e) => setMemberAId(e.target.value)} style={selectStyle}>
               <option value="">— Choisir —</option>
               {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.prenom} {m.nom}
-                </option>
+                <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">Membre B</label>
-            <select
-              value={memberBId}
-              onChange={(e) => setMemberBId(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
+            <label style={labelStyle}>Membre B</label>
+            <select value={memberBId} onChange={(e) => setMemberBId(e.target.value)} style={selectStyle}>
               <option value="">— Choisir —</option>
               {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.prenom} {m.nom}
-                </option>
+                <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>
               ))}
             </select>
           </div>
           <button
             onClick={handleAdd}
             disabled={!memberAId || !memberBId}
-            className="px-4 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 14px',
+              fontSize: 12,
+              background: 'var(--violet)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              cursor: !memberAId || !memberBId ? 'not-allowed' : 'pointer',
+              opacity: !memberAId || !memberBId ? 0.5 : 1,
+              fontWeight: 500,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
+            <IconPlus size={12} stroke={1.5} />
             Ajouter
           </button>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && (
+            <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>
+          )}
         </div>
       )}
     </div>
   )
+}
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 11,
+  color: 'var(--text-muted)',
+  fontFamily: 'DM Mono, monospace',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  marginBottom: 5,
+}
+
+const selectStyle = {
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 10px',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+  outline: 'none',
+  fontFamily: "'DM Sans', sans-serif",
+  cursor: 'pointer',
 }

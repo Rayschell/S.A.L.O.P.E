@@ -1,13 +1,4 @@
-const WARNING_ICONS = {
-  no_respo_bar: '🔴',
-  slot_understaffed: '⚠️',
-  no_bureau: '🔵',
-  maybe_forced: '🟡',
-  affinity_unsatisfied: '💜',
-  over_quota: '📈',
-  long_pause: 'ℹ️',
-  no_slots: 'ℹ️',
-}
+import { IconAlertTriangle, IconAlertCircle, IconInfoCircle } from '@tabler/icons-react'
 
 const WARNING_LABELS = {
   no_respo_bar: 'Respo bar manquant',
@@ -20,31 +11,22 @@ const WARNING_LABELS = {
   no_slots: 'Info',
 }
 
-const WARNING_COLORS = {
-  no_respo_bar: 'bg-red-50 border-red-200 text-red-800',
-  slot_understaffed: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-  no_bureau: 'bg-blue-50 border-blue-200 text-blue-800',
-  maybe_forced: 'bg-orange-50 border-orange-200 text-orange-800',
-  affinity_unsatisfied: 'bg-purple-50 border-purple-200 text-purple-800',
-  over_quota: 'bg-red-50 border-red-200 text-red-800',
-  long_pause: 'bg-gray-50 border-gray-200 text-gray-600',
-  no_slots: 'bg-gray-50 border-gray-200 text-gray-600',
+const WARNING_STYLE = {
+  no_respo_bar: { bg: 'var(--red-soft)', border: 'rgba(240,82,82,0.2)', color: 'var(--red)', Icon: IconAlertCircle },
+  slot_understaffed: { bg: 'var(--amber-soft)', border: 'rgba(245,158,11,0.2)', color: 'var(--amber)', Icon: IconAlertTriangle },
+  maybe_forced: { bg: 'var(--amber-soft)', border: 'rgba(245,158,11,0.2)', color: 'var(--amber)', Icon: IconAlertTriangle },
+  over_quota: { bg: 'var(--red-soft)', border: 'rgba(240,82,82,0.2)', color: 'var(--red)', Icon: IconAlertCircle },
+  no_bureau: { bg: 'var(--accent-soft)', border: 'rgba(37,99,196,0.2)', color: 'var(--accent)', Icon: IconInfoCircle },
+  affinity_unsatisfied: { bg: 'var(--violet-soft)', border: 'rgba(124,106,247,0.2)', color: 'var(--violet)', Icon: IconInfoCircle },
+  long_pause: { bg: 'rgba(255,255,255,0.04)', border: 'var(--border)', color: 'var(--text-muted)', Icon: IconInfoCircle },
+  no_slots: { bg: 'rgba(255,255,255,0.04)', border: 'var(--border)', color: 'var(--text-muted)', Icon: IconInfoCircle },
 }
 
-export default function WarningsList({ warnings, slots, members }) {
+const DEFAULT_STYLE = { bg: 'rgba(255,255,255,0.04)', border: 'var(--border)', color: 'var(--text-muted)', Icon: IconInfoCircle }
+
+export default function WarningsList({ warnings }) {
   if (warnings.length === 0) return null
 
-  const getSlotLabel = (slotId) => {
-    const s = slots.find((s) => s.id === slotId)
-    if (!s) return `Créneau #${slotId}`
-    return new Date(s.heure_debut).toLocaleTimeString('fr-FR', {
-      hour: '2-digit', minute: '2-digit',
-    }) + ' – ' + new Date(s.heure_fin).toLocaleTimeString('fr-FR', {
-      hour: '2-digit', minute: '2-digit',
-    })
-  }
-
-  // Group by type
   const grouped = {}
   for (const w of warnings) {
     if (!grouped[w.type]) grouped[w.type] = []
@@ -52,22 +34,36 @@ export default function WarningsList({ warnings, slots, members }) {
   }
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700">
-        ⚠ {warnings.length} avertissement(s) après génération
-      </h3>
-      {Object.entries(grouped).map(([type, items]) => (
-        <div key={type} className={`border rounded-lg px-4 py-3 text-sm ${WARNING_COLORS[type] || 'bg-gray-50 border-gray-200'}`}>
-          <p className="font-semibold mb-1">
-            {WARNING_ICONS[type]} {WARNING_LABELS[type] || type} ({items.length})
-          </p>
-          <ul className="space-y-0.5 text-xs">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <p style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+        {warnings.length} avertissement(s) après génération
+      </p>
+      {Object.entries(grouped).map(([type, items]) => {
+        const { bg, border, color, Icon } = WARNING_STYLE[type] || DEFAULT_STYLE
+        return (
+          <div
+            key={type}
+            style={{
+              background: bg,
+              border: `1px solid ${border}`,
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: items.length > 1 ? 6 : 0 }}>
+              <Icon size={13} stroke={1.5} color={color} />
+              <span style={{ fontSize: 12, fontWeight: 500, color }}>
+                {WARNING_LABELS[type] || type} ({items.length})
+              </span>
+            </div>
             {items.map((w, i) => (
-              <li key={i}>• {w.message}</li>
+              <p key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, paddingLeft: 20 }}>
+                · {w.message}
+              </p>
             ))}
-          </ul>
-        </div>
-      ))}
+          </div>
+        )
+      })}
     </div>
   )
 }

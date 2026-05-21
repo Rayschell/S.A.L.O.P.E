@@ -1,0 +1,95 @@
+.planning-wrapper {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.planning-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.planning-table thead th {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 9px 10px;
+  text-align: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+.planning-table thead th:first-child {
+  text-align: left;
+  padding-left: 14px;
+  min-width: 140px;
+}
+.planning-table thead th:last-child { border-right: none; }
+
+.planning-table tbody td {
+  padding: 7px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+.planning-table tbody td:first-child {
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding-left: 14px;
+  border-right: 1px solid var(--border);
+}
+.planning-table tbody td:last-child { border-right: none; }
+.planning-table tbody tr:last-child td { border-bottom: none; }
+.planning-table tbody tr:hover td { background: var(--bg-elevated); }
+
+.cell-staff {
+  background: var(--green-soft) !important;
+  color: var(--green) !important;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.cell-respo {
+  background: var(--red-soft) !important;
+  color: var(--red) !important;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.bureau-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: var(--violet);
+  border-radius: 50%;
+  margin-left: 5px;
+  vertical-align: middle;
+  margin-bottom: 1px;
+}
+
+.planning-table tfoot td {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  padding: 8px 10px;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+.planning-table tfoot td:first-child {
+  text-align: left;
+  padding-left: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  border-right: 1px solid var(--border);
+}
+.planning-table tfoot td:last-child { border-right: none; }

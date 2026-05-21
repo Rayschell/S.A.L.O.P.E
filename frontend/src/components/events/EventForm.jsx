@@ -2,11 +2,7 @@ import { useState } from 'react'
 import { eventsApi } from '../../api/events.js'
 
 export default function EventForm({ onSaved, onCancel }) {
-  const [form, setForm] = useState({
-    nom: '',
-    date: '',
-    type: 'soiree',
-  })
+  const [form, setForm] = useState({ nom: '', date: '', type: 'soiree' })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -25,37 +21,39 @@ export default function EventForm({ onSaved, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">Nouvel événement</h2>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+        Nouvel événement
+      </h2>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Nom</label>
+        <label style={labelStyle}>Nom</label>
         <input
           value={form.nom}
           onChange={(e) => setForm({ ...form, nom: e.target.value })}
           required
           placeholder="ex. Soirée Printemps 2026"
-          className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={inputStyle}
         />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+        <label style={labelStyle}>Date</label>
         <input
           type="datetime-local"
           value={form.date}
           onChange={(e) => setForm({ ...form, date: e.target.value })}
           required
-          className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={inputStyle}
         />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+        <label style={labelStyle}>Type</label>
         <select
           value={form.type}
           onChange={(e) => setForm({ ...form, type: e.target.value })}
-          className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={selectStyle}
         >
           <option value="soiree">Soirée</option>
           <option value="afterwork">Afterwork</option>
@@ -63,23 +61,86 @@ export default function EventForm({ onSaved, onCancel }) {
       </div>
 
       {error && (
-        <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div
+          style={{
+            background: 'var(--red-soft)',
+            border: '1px solid rgba(240, 82, 82, 0.2)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 12px',
+            fontSize: 12,
+            color: 'var(--red)',
+          }}
+        >
           {error}
-        </p>
+        </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm rounded border hover:bg-gray-50">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+        <button type="button" onClick={onCancel} style={btnCancelStyle}>
           Annuler
         </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-4 py-2 text-sm rounded bg-blue-700 text-white hover:bg-blue-600 disabled:opacity-50"
-        >
+        <button type="submit" disabled={saving} style={{ ...btnSubmitStyle, opacity: saving ? 0.6 : 1 }}>
           {saving ? 'Création…' : 'Créer'}
         </button>
       </div>
     </form>
   )
+}
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 11,
+  color: 'var(--text-muted)',
+  fontFamily: 'DM Mono, monospace',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  marginBottom: 5,
+}
+
+const inputStyle = {
+  width: '100%',
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 10px',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+  outline: 'none',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const selectStyle = {
+  width: '100%',
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 10px',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+  outline: 'none',
+  fontFamily: "'DM Sans', sans-serif",
+  cursor: 'pointer',
+}
+
+const btnCancelStyle = {
+  padding: '7px 14px',
+  fontSize: 12,
+  background: 'var(--bg-high)',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const btnSubmitStyle = {
+  padding: '7px 14px',
+  fontSize: 12,
+  background: 'var(--violet)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontWeight: 500,
+  fontFamily: "'DM Sans', sans-serif",
 }

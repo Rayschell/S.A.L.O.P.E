@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { membersApi } from '../../api/members.js'
+import { IconEye, IconEyeOff } from '@tabler/icons-react'
 
 const ALL_ROLES = ['staff', 'bureau']
 
@@ -20,19 +21,14 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
   const toggleRole = (role) => {
     setForm((f) => ({
       ...f,
-      roles: f.roles.includes(role)
-        ? f.roles.filter((r) => r !== role)
-        : [...f.roles, role],
+      roles: f.roles.includes(role) ? f.roles.filter((r) => r !== role) : [...f.roles, role],
     }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (form.roles.length === 0) {
-      setError('Au moins un rôle est requis.')
-      return
-    }
+    if (form.roles.length === 0) { setError('Au moins un rôle est requis.'); return }
     setSaving(true)
     try {
       const payload = { ...form }
@@ -53,72 +49,59 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>
         {isEdit ? 'Modifier le membre' : 'Ajouter un membre'}
       </h2>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Prénom</label>
-          <input
-            value={form.prenom}
-            onChange={(e) => setForm({ ...form, prenom: e.target.value })}
-            required
-            className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <label style={labelStyle}>Prénom</label>
+          <input value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} required style={inputStyle} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Nom</label>
-          <input
-            value={form.nom}
-            onChange={(e) => setForm({ ...form, nom: e.target.value })}
-            required
-            className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <label style={labelStyle}>Nom</label>
+          <input value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} required style={inputStyle} />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-        <input
-          type="email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <label style={labelStyle}>Email</label>
+        <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={inputStyle} />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Mot de passe{isEdit ? ' (laisser vide pour ne pas changer)' : ''}</label>
-        <div className="relative">
+        <label style={labelStyle}>
+          Mot de passe{isEdit ? ' (laisser vide pour ne pas changer)' : ''}
+        </label>
+        <div style={{ position: 'relative' }}>
           <input
             type={showPassword ? 'text' : 'password'}
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="w-full border rounded px-3 py-1.5 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ ...inputStyle, paddingRight: 36 }}
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-700"
             tabIndex={-1}
+            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
           >
-            {showPassword ? '🙈' : '👁️'}
+            {showPassword ? <IconEyeOff size={13} stroke={1.5} /> : <IconEye size={13} stroke={1.5} />}
           </button>
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-2">Rôles</label>
-        <div className="flex gap-3">
+        <label style={labelStyle}>Rôles</label>
+        <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
           {ALL_ROLES.map((r) => (
-            <label key={r} className="flex items-center gap-2 cursor-pointer text-sm">
+            <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)' }}>
               <input
                 type="checkbox"
                 checked={form.roles.includes(r)}
                 onChange={() => toggleRole(r)}
-                className="rounded"
+                style={{ accentColor: 'var(--violet)', width: 14, height: 14 }}
               />
               {r === 'staff' ? 'Staff' : 'Bureau'}
             </label>
@@ -126,36 +109,74 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
         </div>
       </div>
 
-      
-
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Shifts respo bar</label>
+        <label style={labelStyle}>Shifts respo bar</label>
         <input
-          type="number" min="0"
+          type="number"
+          min="0"
           value={form.shifts_respo_bar_cumules}
           onChange={(e) => setForm({ ...form, shifts_respo_bar_cumules: parseInt(e.target.value, 10) })}
-          className="w-full border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ ...inputStyle, width: 100 }}
         />
       </div>
 
       {error && (
-        <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">
+        <div style={{ background: 'var(--red-soft)', border: '1px solid rgba(240,82,82,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: 12, color: 'var(--red)' }}>
           {error}
-        </p>
+        </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm rounded border hover:bg-gray-50">
-          Annuler
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-4 py-2 text-sm rounded bg-blue-700 text-white hover:bg-blue-600 disabled:opacity-50"
-        >
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+        <button type="button" onClick={onCancel} style={btnCancelStyle}>Annuler</button>
+        <button type="submit" disabled={saving} style={{ ...btnSubmitStyle, opacity: saving ? 0.6 : 1 }}>
           {saving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
     </form>
   )
+}
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 11,
+  color: 'var(--text-muted)',
+  fontFamily: 'DM Mono, monospace',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  marginBottom: 5,
+}
+
+const inputStyle = {
+  width: '100%',
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 10px',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+  outline: 'none',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const btnCancelStyle = {
+  padding: '7px 14px',
+  fontSize: 12,
+  background: 'var(--bg-high)',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const btnSubmitStyle = {
+  padding: '7px 14px',
+  fontSize: 12,
+  background: 'var(--violet)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontWeight: 500,
+  fontFamily: "'DM Sans', sans-serif",
 }

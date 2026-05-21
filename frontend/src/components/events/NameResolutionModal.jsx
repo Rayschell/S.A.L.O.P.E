@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { IconX } from '@tabler/icons-react'
 
 export default function NameResolutionModal({ pending, onResolved, onCancel }) {
-  // resolutions: {csv_name, member_id?, create_new, availabilities}
   const [resolutions, setResolutions] = useState(
     pending.map((p) => ({
       csv_name: p.csv_name,
@@ -19,57 +19,107 @@ export default function NameResolutionModal({ pending, onResolved, onCancel }) {
     })
   }
 
-  const handleConfirm = () => {
-    onResolved(resolutions)
-  }
+  const handleConfirm = () => onResolved(resolutions)
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-800">
-            Résolution manuelle des noms ({pending.length})
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Les noms suivants n'ont pas pu être résolus automatiquement. Choisissez le membre correspondant ou créez-en un nouveau.
-          </p>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 50,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-mid)',
+          borderRadius: 'var(--radius-lg)',
+          width: '100%',
+          maxWidth: 580,
+          maxHeight: '80vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
+              Résolution manuelle des noms ({pending.length})
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
+              Choisissez le membre correspondant ou créez-en un nouveau.
+            </p>
+          </div>
+          <button
+            onClick={onCancel}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+          >
+            <IconX size={16} stroke={1.5} />
+          </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+        {/* Scrollable content */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {pending.map((p, idx) => {
             const res = resolutions[idx]
             return (
-              <div key={p.csv_name} className="border border-gray-200 rounded-lg p-4">
-                <p className="font-medium text-gray-800 mb-3">
-                  📋 <span className="font-mono bg-gray-100 px-1 rounded">{p.csv_name}</span>
+              <div
+                key={p.csv_name}
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 14px',
+                }}
+              >
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                  Nom brut :{' '}
+                  <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--text-primary)', background: 'var(--bg-high)', padding: '1px 6px', borderRadius: 3 }}>
+                    {p.csv_name}
+                  </span>
                 </p>
-
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {p.suggestions.map((s) => (
-                    <label key={s.member_id} className="flex items-center gap-3 cursor-pointer text-sm">
+                    <label
+                      key={s.member_id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}
+                    >
                       <input
                         type="radio"
                         name={`resolution-${idx}`}
                         checked={!res.create_new && res.member_id === s.member_id}
-                        onChange={() =>
-                          updateResolution(idx, { member_id: s.member_id, create_new: false })
-                        }
+                        onChange={() => updateResolution(idx, { member_id: s.member_id, create_new: false })}
+                        style={{ accentColor: 'var(--violet)' }}
                       />
-                      <span>{s.display_name}</span>
-                      <span className="text-xs text-gray-400">Score : {s.score}%</span>
+                      {s.display_name}
+                      <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)' }}>
+                        {s.score}%
+                      </span>
                     </label>
                   ))}
-
-                  <label className="flex items-center gap-3 cursor-pointer text-sm">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--accent)' }}>
                     <input
                       type="radio"
                       name={`resolution-${idx}`}
                       checked={res.create_new}
-                      onChange={() =>
-                        updateResolution(idx, { create_new: true, member_id: null })
-                      }
+                      onChange={() => updateResolution(idx, { create_new: true, member_id: null })}
+                      style={{ accentColor: 'var(--violet)' }}
                     />
-                    <span className="text-blue-700">➕ Créer un nouveau membre « {p.csv_name} »</span>
+                    + Créer un nouveau membre « {p.csv_name} »
                   </label>
                 </div>
               </div>
@@ -77,21 +127,45 @@ export default function NameResolutionModal({ pending, onResolved, onCancel }) {
           })}
         </div>
 
-        <div className="px-6 py-4 border-t flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm rounded border hover:bg-gray-50"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="px-4 py-2 text-sm rounded bg-blue-700 text-white hover:bg-blue-600"
-          >
+        {/* Footer */}
+        <div
+          style={{
+            padding: '12px 20px',
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 8,
+          }}
+        >
+          <button onClick={onCancel} style={btnCancelStyle}>Annuler</button>
+          <button onClick={handleConfirm} style={btnConfirmStyle}>
             Confirmer les résolutions
           </button>
         </div>
       </div>
     </div>
   )
+}
+
+const btnCancelStyle = {
+  padding: '7px 14px',
+  fontSize: 12,
+  background: 'var(--bg-high)',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const btnConfirmStyle = {
+  padding: '7px 14px',
+  fontSize: 12,
+  background: 'var(--violet)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontWeight: 500,
+  fontFamily: "'DM Sans', sans-serif",
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventsApi } from '../../api/events.js'
+import { IconArrowUp, IconArrowDown, IconX } from '@tabler/icons-react'
 
 export default function RespoBarConfig({ eventId, members, resposBar, onSaved, disabled }) {
   const bureauMembers = members.filter((m) => m.roles?.includes('bureau'))
@@ -7,22 +8,15 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
   const [saving, setSaving] = useState(false)
 
   const addRespo = (memberId) => {
-    if (!ordered.includes(memberId)) {
-      setOrdered([...ordered, memberId])
-    }
+    if (!ordered.includes(memberId)) setOrdered([...ordered, memberId])
   }
-
-  const removeRespo = (memberId) => {
-    setOrdered(ordered.filter((id) => id !== memberId))
-  }
-
+  const removeRespo = (memberId) => setOrdered(ordered.filter((id) => id !== memberId))
   const moveUp = (idx) => {
     if (idx === 0) return
     const next = [...ordered]
     ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
     setOrdered(next)
   }
-
   const moveDown = (idx) => {
     if (idx === ordered.length - 1) return
     const next = [...ordered]
@@ -44,21 +38,20 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
   }
 
   const getMember = (id) => members.find((m) => m.id === id)
-
   const available = bureauMembers.filter((m) => !ordered.includes(m.id))
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-700">Désignation des respos bar</h2>
-      <p className="text-sm text-gray-500">
-        Optionnel. Désignez les respos bar dans l'ordre d'affectation. Si vide, la sélection est
-        automatique (tri par nombre de shifts respo bar cumulés).
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+        Optionnel. Désignez les respos bar dans l'ordre d'affectation.
+        Si vide, la sélection est automatique (tri par shifts cumulés).
       </p>
 
-      {/* Ordered list */}
-      <div className="space-y-2">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ordered.length === 0 && (
-          <p className="text-sm text-gray-400 italic">Aucun respo bar désigné (sélection automatique)</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Aucun respo bar désigné (sélection automatique)
+          </p>
         )}
         {ordered.map((memberId, idx) => {
           const m = getMember(memberId)
@@ -66,34 +59,35 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
           return (
             <div
               key={memberId}
-              className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2.5"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 12px',
+              }}
             >
-              <span className="text-sm font-medium text-gray-500 w-5 text-center">{idx + 1}</span>
-              <span className="flex-1 text-sm font-medium text-gray-800">
+              <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)', width: 16, textAlign: 'center' }}>
+                {idx + 1}
+              </span>
+              <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
                 {m.prenom} {m.nom}
-                <span className="ml-2 text-xs text-gray-400">({m.shifts_respo_bar_cumules} shifts)</span>
+                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
+                  ({m.shifts_respo_bar_cumules} shifts)
+                </span>
               </span>
               {!disabled && (
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => moveUp(idx)}
-                    disabled={idx === 0}
-                    className="px-1.5 py-0.5 text-xs rounded border disabled:opacity-30 hover:bg-gray-50"
-                  >
-                    ↑
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={() => moveUp(idx)} disabled={idx === 0} style={iconBtn(idx === 0 ? 0.3 : 1)}>
+                    <IconArrowUp size={11} stroke={1.5} />
                   </button>
-                  <button
-                    onClick={() => moveDown(idx)}
-                    disabled={idx === ordered.length - 1}
-                    className="px-1.5 py-0.5 text-xs rounded border disabled:opacity-30 hover:bg-gray-50"
-                  >
-                    ↓
+                  <button onClick={() => moveDown(idx)} disabled={idx === ordered.length - 1} style={iconBtn(idx === ordered.length - 1 ? 0.3 : 1)}>
+                    <IconArrowDown size={11} stroke={1.5} />
                   </button>
-                  <button
-                    onClick={() => removeRespo(memberId)}
-                    className="px-2 py-0.5 text-xs rounded bg-red-50 text-red-600 hover:bg-red-100"
-                  >
-                    ×
+                  <button onClick={() => removeRespo(memberId)} style={{ ...iconBtn(1), color: 'var(--red)' }}>
+                    <IconX size={11} stroke={1.5} />
                   </button>
                 </div>
               )}
@@ -102,30 +96,38 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
         })}
       </div>
 
-      {/* Add member */}
       {!disabled && available.length > 0 && (
-        <div>
-          <select
-            defaultValue=""
-            onChange={(e) => { if (e.target.value) addRespo(parseInt(e.target.value, 10)); e.target.value = '' }}
-            className="border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">+ Ajouter un respo bar…</option>
-            {available.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.prenom} {m.nom} ({m.shifts_respo_bar_cumules} shifts)
-              </option>
-            ))}
-          </select>
-        </div>
+        <select
+          defaultValue=""
+          onChange={(e) => { if (e.target.value) addRespo(parseInt(e.target.value, 10)); e.target.value = '' }}
+          style={selectStyle}
+        >
+          <option value="">+ Ajouter un respo bar…</option>
+          {available.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.prenom} {m.nom} ({m.shifts_respo_bar_cumules} shifts)
+            </option>
+          ))}
+        </select>
       )}
 
       {!disabled && (
-        <div className="flex justify-end">
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-sm bg-blue-700 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+            style={{
+              background: 'var(--violet)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              padding: '7px 16px',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
@@ -133,4 +135,30 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
       )}
     </div>
   )
+}
+
+const iconBtn = (opacity = 1) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 22,
+  height: 22,
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border)',
+  borderRadius: 4,
+  cursor: 'pointer',
+  color: 'var(--text-muted)',
+  opacity,
+})
+
+const selectStyle = {
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 10px',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+  outline: 'none',
+  fontFamily: "'DM Sans', sans-serif",
+  cursor: 'pointer',
 }

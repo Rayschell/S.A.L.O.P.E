@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventsApi } from '../../api/events.js'
+import '../../styles/planning.css'
 
 export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
   const [maxPersonnes, setMaxPersonnes] = useState(
@@ -21,39 +22,40 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
     }
   }
 
-  const fmt = (dt) => new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  const fmtDate = (dt) => new Date(dt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  const fmt = (dt) =>
+    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const fmtDate = (dt) =>
+    new Date(dt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
   if (slots.length === 0) {
     return (
-      <div className="text-gray-400 py-8 text-center text-sm">
+      <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 12 }}>
         Aucun créneau. Importez d'abord un CSV.
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-700">Configuration des créneaux</h2>
-      <p className="text-sm text-gray-500">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
         Définissez le nombre maximum de personnes par créneau.
       </p>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-600 uppercase">
+      <div className="planning-wrapper">
+        <table className="planning-table">
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-left">Créneau</th>
-              <th className="px-4 py-3 text-center w-40">Max personnes</th>
+              <th>Créneau</th>
+              <th style={{ width: 160 }}>Max personnes</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {slots.map((s) => (
               <tr key={s.id}>
-                <td className="px-4 py-3 text-gray-700">
+                <td>
                   {fmtDate(s.heure_debut)} · {fmt(s.heure_debut)} – {fmt(s.heure_fin)}
                 </td>
-                <td className="px-4 py-3 text-center">
+                <td>
                   <input
                     type="number"
                     min="1"
@@ -66,7 +68,18 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
                         [s.id]: parseInt(e.target.value, 10),
                       }))
                     }
-                    className="w-20 border rounded px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                    style={{
+                      width: 70,
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-mid)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '4px 8px',
+                      textAlign: 'center',
+                      fontSize: 13,
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      fontFamily: 'DM Mono, monospace',
+                    }}
                   />
                 </td>
               </tr>
@@ -76,11 +89,22 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
       </div>
 
       {!disabled && (
-        <div className="flex justify-end">
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-sm bg-blue-700 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+            style={{
+              background: 'var(--violet)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              padding: '7px 16px',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>

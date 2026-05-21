@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import MemberForm from '../components/members/MemberForm.jsx'
 import MemberTable from '../components/members/MemberTable.jsx'
 import MemberStats from '../components/members/MemberStats.jsx'
+import { IconPlus, IconRefresh, IconX, IconUsers } from '@tabler/icons-react'
 
 export default function MembersPage() {
   const { user } = useAuth()
@@ -62,28 +63,27 @@ export default function MembersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Membres</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <IconUsers size={16} stroke={1.5} color="var(--text-muted)" />
+          <h1 style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Membres</h1>
+        </div>
         {isBureau && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleResetAll}
-              className="px-3 py-2 text-sm border border-orange-400 text-orange-700 rounded-lg hover:bg-orange-50"
-            >
-              Réinit. tous les compteurs
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleResetAll} style={btnGhostStyle}>
+              <IconRefresh size={12} stroke={1.5} />
+              Réinit. compteurs
             </button>
-            <button
-              onClick={() => { setEditing(null); setShowForm(true) }}
-              className="px-4 py-2 text-sm bg-blue-700 text-white rounded-lg hover:bg-blue-600"
-            >
-              + Ajouter un membre
+            <button onClick={() => { setEditing(null); setShowForm(true) }} style={btnPrimaryStyle}>
+              <IconPlus size={12} stroke={1.5} />
+              Ajouter un membre
             </button>
           </div>
         )}
       </div>
 
       {loading ? (
-        <p className="text-gray-500">Chargement…</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
       ) : (
         <MemberTable
           members={members}
@@ -96,8 +96,8 @@ export default function MembersPage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
+        <div style={overlayStyle}>
+          <div style={panelStyle}>
             <MemberForm
               initial={editing}
               onSaved={handleSaved}
@@ -108,21 +108,21 @@ export default function MembersPage() {
       )}
 
       {statsModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
+        <div style={overlayStyle}>
+          <div style={{ ...panelStyle, maxWidth: 540 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
                 Stats — {statsModal.member.prenom} {statsModal.member.nom}
               </h2>
               <button
                 onClick={() => setStatsModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
               >
-                ×
+                <IconX size={16} stroke={1.5} />
               </button>
             </div>
             {statsLoading
-              ? <p className="text-gray-400 text-sm">Chargement…</p>
+              ? <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
               : <MemberStats stats={statsModal.stats} />
             }
           </div>
@@ -130,4 +130,54 @@ export default function MembersPage() {
       )}
     </div>
   )
+}
+
+const btnPrimaryStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: 'var(--violet)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 14px',
+  fontSize: 12,
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const btnGhostStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: 'var(--bg-high)',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '7px 14px',
+  fontSize: 12,
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: "'DM Sans', sans-serif",
+}
+
+const overlayStyle = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0, 0, 0, 0.6)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 50,
+}
+
+const panelStyle = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-lg)',
+  padding: 24,
+  width: '100%',
+  maxWidth: 440,
+  margin: '0 16px',
 }
