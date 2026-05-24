@@ -3,12 +3,78 @@ export default function MemberStats({ stats, respoBar, maxRespoBar, isMemberBure
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <HoursSummary stats={stats} />
       {isMemberBureau && respoBar > 0 && (
         <RespoBarHistogram count={respoBar ?? 0} max={maxRespoBar ?? 1} />
       )}
       <Histogram title="Afterwork" entries={stats.afterwork} colorRaw="#2563c4" slotLabels={stats.afterwork_slot_labels ?? {}} />
       <Histogram title="Soirée" entries={stats.soiree} colorRaw="#7c6af7" slotLabels={stats.soiree_slot_labels ?? {}} />
       <Timeline events={timeline} />
+    </div>
+  )
+}
+
+const SEUIL_HEURES = 10
+
+function HoursSummary({ stats }) {
+  const afterwork = stats.total_heures_afterwork ?? 0
+  const soiree = stats.total_heures_soiree ?? 0
+  const cumule = stats.total_heures_cumule ?? 0
+  const bienMembre = stats.bien_membre ?? false
+  const progress = Math.min(cumule / SEUIL_HEURES, 1)
+
+  return (
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', margin: 0 }}>Heures staffé·e·s</p>
+        {bienMembre && (
+          <span style={{
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '2px 8px',
+            borderRadius: 99,
+            background: 'rgba(251,191,36,0.18)',
+            color: '#f59e0b',
+            border: '1px solid rgba(251,191,36,0.35)',
+            fontFamily: 'DM Mono, monospace',
+            letterSpacing: '0.04em',
+          }}>
+            ✦ Bien membré·e·s
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <StatPill label="Afterwork" value={afterwork} color="#2563c4" />
+        <StatPill label="Soirée" value={soiree} color="#7c6af7" />
+        <StatPill label="Total" value={cumule} color={bienMembre ? '#f59e0b' : 'var(--text-primary)'} bold />
+      </div>
+
+      {/* Progress bar toward Bien membré·e·s */}
+      {!bienMembre && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
+              Vers Bien membré·e·s
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
+              {cumule}h / {SEUIL_HEURES}h
+            </span>
+          </div>
+          <div style={{ height: 5, background: 'var(--bg-high)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${progress * 100}%`, background: '#4ade80', borderRadius: 99, transition: 'width 0.4s ease' }} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatPill({ label, value, color, bold }) {
+  return (
+    <div style={{ flex: 1, background: 'var(--bg-high)', borderRadius: 6, padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+      <span style={{ fontSize: 16, fontWeight: bold ? 700 : 500, color, fontFamily: 'DM Mono, monospace', lineHeight: 1.2 }}>{value}h</span>
     </div>
   )
 }

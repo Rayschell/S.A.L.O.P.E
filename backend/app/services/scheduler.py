@@ -593,35 +593,22 @@ def check_manual_assignment(
     creneau_id: int,
 ) -> Optional[str]:
     """
-    Validate for a manual assignment.
-    Only hard constraint checked: R6 (slot capacity).
-    R1 is soft in the solver but still validated here as a warning hint.
+    Validate a manual assignment.
+    Only blocks if the member is explicitly unavailable (statut 'no') on the slot.
+    Slot capacity is not enforced for manual overrides.
     """
-    from typing import Set as _Set
-
     slot = db.query(Slot).filter(
         Slot.id == creneau_id, Slot.evenement_id == event_id
     ).first()
     if not slot:
         return "Créneau introuvable"
 
-    # R6 (hard)
-    already_there = db.query(Assignment).filter(
-        Assignment.creneau_id == creneau_id,
-        Assignment.membre_id == membre_id,
-    ).first()
-    if not already_there:
-        count = db.query(Assignment).filter(Assignment.creneau_id == creneau_id).count()
-        if count >= slot.max_personnes:
-            return f"R6 : créneau complet ({slot.max_personnes}/{slot.max_personnes})"
-
-    # R5 — keep as informational
     avail = db.query(Availability).filter(
         Availability.evenement_id == event_id,
         Availability.membre_id == membre_id,
         Availability.creneau_id == creneau_id,
     ).first()
     if avail and avail.statut.value == "no":
-        return "R5 : ce membre est indisponible (statut 'no') — ignoré si nécessaire"
+        return "Ce membre est indisponible sur ce créneau"
 
     return None

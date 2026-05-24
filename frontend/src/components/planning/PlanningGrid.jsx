@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { eventsApi } from '../../api/events.js'
 import '../../styles/planning.css'
 
@@ -13,9 +13,20 @@ export default function PlanningGrid({
   eventId,
   disabled,
 }) {
-  const [editCell, setEditCell] = useState(null)
+  const [editCell, setEditCell] = useState(null) // { memberId, slotId, x, y }
   const [cellLoading, setCellLoading] = useState(null)
   const [cellError, setCellError] = useState(null)
+  const popupRef = useRef(null)
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (!editCell) return
+    const onDown = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) setEditCell(null)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [editCell])
 
   // Auto-dismiss error after 3.5s
   useEffect(() => {
@@ -62,33 +73,23 @@ export default function PlanningGrid({
   const getCellLabel = (asgn) => {
     if (!asgn) return ''
     if (asgn.type === 'respo_bar') return 'Respo'
-    return asgn.maybe_force ? 'Maybe' : 'Staff'
+    return 'Staff'
   }
 
-  const slotMemberIds = {}
-  for (const a of assignments) {
-    if (!slotMemberIds[a.creneau_id]) slotMemberIds[a.creneau_id] = new Set()
-    slotMemberIds[a.creneau_id].add(a.membre_id)
-  }
-
-  const affinityOnSlot = (memberId, slotId) => {
-    const others = slotMemberIds[slotId] || new Set()
-    for (const otherId of others) {
-      if (otherId !== memberId && affSet.has(`${memberId}-${otherId}`)) return true
-    }
-    return false
-  }
-
-  const handleCellClick = (memberId, slotId) => {
+  const handleCellClick = (e, memberId, slotId) => {
     if (disabled) return
     setCellError(null)
     const key = `${memberId}-${slotId}`
-    // Block adding an assignment if member is explicitly unavailable
     if (!asgMap[key] && noDispoSet.has(key)) {
       setCellError({ memberId, slotId, message: 'Ce membre est indisponible sur ce créneau' })
       return
     }
-    setEditCell({ memberId, slotId })
+    if (editCell?.memberId === memberId && editCell?.slotId === slotId) {
+      setEditCell(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setEditCell({ memberId, slotId, x: rect.left, y: rect.bottom + 6 })
   }
 
   const handleAssign = async (memberId, slotId, type) => {
@@ -155,69 +156,21 @@ export default function PlanningGrid({
                   {slots.map((slot) => {
                     const asgn = asgMap[`${member.id}-${slot.id}`]
                     const cellKey = `${member.id}-${slot.id}`
-                    const isEditing = editCell?.memberId === member.id && editCell?.slotId === slot.id
                     const isLoading = cellLoading === cellKey
-                    const satisfied = asgn ? affinityOnSlot(member.id, slot.id) : false
+                    const isEditing = editCell?.memberId === member.id && editCell?.slotId === slot.id
                     return (
                       <td
                         key={slot.id}
                         className={getCellClass(asgn)}
-                        onClick={() => handleCellClick(member.id, slot.id)}
+                        onClick={(e) => handleCellClick(e, member.id, slot.id)}
                         style={{ cursor: !disabled ? 'pointer' : 'default', opacity: isLoading ? 0.5 : 1, position: 'relative' }}
                       >
-                        {asgn && (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <span>{getCellLabel(asgn)}</span>
-                            {satisfied && (
-                              <span style={{ fontSize: 10, color: 'var(--violet)' }} title="Affinité satisfaite">♥</span>
-                            )}
-                            {asgn.maybe_force && (
-                              <span style={{ fontSize: 10, color: 'var(--amber)' }} title="Forcé (maybe)">!</span>
-                            )}
-                          </div>
-                        )}
-
-                        {isEditing && !disabled && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              zIndex: 30,
-                              background: 'var(--bg-elevated)',
-                              border: '1px solid var(--border-mid)',
-                              borderRadius: 'var(--radius-md)',
-                              padding: 6,
-                              left: 0,
-                              top: '100%',
-                              marginTop: 4,
-                              minWidth: 130,
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button onClick={() => handleAssign(member.id, slot.id, 'staff')} style={editorBtn('var(--green-soft)', 'var(--green)')}>
-                              Staff
-                            </button>
-                            {event.type === 'soiree' && (
-                              <button onClick={() => handleAssign(member.id, slot.id, 'respo_bar')} style={editorBtn('var(--red-soft)', 'var(--red)')}>
-                                Respo bar
-                              </button>
-                            )}
-                            {asgn && (
-                              <button onClick={() => handleAssign(member.id, slot.id, 'none')} style={editorBtn('transparent', 'var(--text-muted)')}>
-                                Retirer
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setEditCell(null)}
-                              style={{ ...editorBtn('transparent', 'var(--text-muted)'), borderTop: '1px solid var(--border)', marginTop: 2, paddingTop: 6 }}
-                            >
-                              Annuler
-                            </button>
-                          </div>
-                        )}
+                        {asgn && <span>{getCellLabel(asgn)}</span>}
 
                         {cellError?.memberId === member.id && cellError?.slotId === slot.id && (
                           <div style={{
-                            position: 'absolute', zIndex: 40, left: 0, top: '100%', marginTop: 4,
+                            position: 'fixed', zIndex: 40,
+                            left: editCell?.x ?? 0, top: (editCell?.y ?? 0),
                             background: 'var(--red-soft)', border: '1px solid rgba(240,82,82,0.3)',
                             borderRadius: 'var(--radius-sm)', padding: '4px 8px', fontSize: 11,
                             color: 'var(--red)', whiteSpace: 'nowrap',
@@ -243,29 +196,57 @@ export default function PlanningGrid({
         </div>
       </div>
 
+      {/* Fixed popup for cell editing */}
+      {editCell && !disabled && (() => {
+        const asgn = asgMap[`${editCell.memberId}-${editCell.slotId}`]
+        return (
+          <div
+            ref={popupRef}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              zIndex: 9999,
+              left: editCell.x,
+              top: editCell.y,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-mid)',
+              borderRadius: 'var(--radius-md)',
+              padding: 6,
+              minWidth: 130,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+            }}
+          >
+            <button onClick={() => handleAssign(editCell.memberId, editCell.slotId, 'staff')} style={editorBtn('var(--green-soft)', 'var(--green)')}>
+              Staff
+            </button>
+            {event.type === 'soiree' && (
+              <button onClick={() => handleAssign(editCell.memberId, editCell.slotId, 'respo_bar')} style={editorBtn('var(--red-soft)', 'var(--red)')}>
+                Respo bar
+              </button>
+            )}
+            {asgn && (
+              <button onClick={() => handleAssign(editCell.memberId, editCell.slotId, 'none')} style={editorBtn('transparent', 'var(--text-muted)')}>
+                Retirer
+              </button>
+            )}
+            <button
+              onClick={() => setEditCell(null)}
+              style={{ ...editorBtn('transparent', 'var(--text-muted)'), borderTop: '1px solid var(--border)', marginTop: 2, paddingTop: 6 }}
+            >
+              Annuler
+            </button>
+          </div>
+        )
+      })()}
+
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, padding: '10px 14px 4px', flexWrap: 'wrap' }}>
-        <LegendItem color="rgba(52,199,123,0.25)" border="rgba(52,199,123,0.4)" label="Staff" />
-        <LegendItem color="rgba(240,82,82,0.2)" border="rgba(240,82,82,0.4)" label="Respo bar" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
-          <span style={{ color: 'var(--violet)', fontSize: 12 }}>♥</span>
-          Affinité satisfaite
-        </div>
         {!disabled && (
           <span style={{ fontSize: 11, color: 'var(--accent)', marginLeft: 'auto' }}>
             Cliquez sur une cellule pour modifier
           </span>
         )}
       </div>
-    </div>
-  )
-}
-
-function LegendItem({ color, border, label }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
-      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: color, border: `1px solid ${border}` }} />
-      {label}
     </div>
   )
 }

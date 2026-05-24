@@ -14,7 +14,7 @@ from ..models.models import (
 )
 from ..schemas.schemas import (
     MemberCreate, MemberRead, MemberReadFull, MemberStatsRead, MemberStatsEntry, MemberUpdate,
-    TimelineEvent, TimelineSlot,
+    TimelineEvent, TimelineSlot, BIEN_MEMBRE_SEUIL_HEURES,
 )
 
 router = APIRouter(prefix="/api/members", tags=["members"])
@@ -179,11 +179,38 @@ def get_member_stats(
             for s in sorted(event.slots, key=lambda s: s.heure_debut)
         }
 
+    # Total hours staffed from published assignments
+    all_assignments = (
+        db.query(Assignment)
+        .join(Slot, Assignment.creneau_id == Slot.id)
+        .join(Event, Slot.evenement_id == Event.id)
+        .filter(
+            Assignment.membre_id == member_id,
+            Event.statut == EventStatutEnum.publie,
+        )
+        .all()
+    )
+    total_heures_afterwork = 0.0
+    total_heures_soiree = 0.0
+    for a in all_assignments:
+        slot = a.slot
+        event = slot.event
+        duration = (slot.heure_fin - slot.heure_debut).total_seconds() / 3600
+        if event.type == EventTypeEnum.afterwork:
+            total_heures_afterwork += duration
+        else:
+            total_heures_soiree += duration
+    total_heures_cumule = total_heures_afterwork + total_heures_soiree
+
     return MemberStatsRead(
         afterwork=afterwork,
         soiree=soiree,
         afterwork_slot_labels=slot_labels(EventTypeEnum.afterwork),
         soiree_slot_labels=slot_labels(EventTypeEnum.soiree),
+        total_heures_afterwork=round(total_heures_afterwork, 1),
+        total_heures_soiree=round(total_heures_soiree, 1),
+        total_heures_cumule=round(total_heures_cumule, 1),
+        bien_membre=total_heures_cumule >= BIEN_MEMBRE_SEUIL_HEURES,
     )
 
 

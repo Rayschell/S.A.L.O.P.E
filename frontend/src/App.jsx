@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import MembersPage from './pages/MembersPage.jsx'
 import EventsPage from './pages/EventsPage.jsx'
 import EventDetailPage from './pages/EventDetailPage.jsx'
+import HistoricalImportPage from './pages/HistoricalImportPage.jsx'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="events" element={<EventsPage />} />
               <Route path="events/:id" element={<EventDetailPage />} />
               <Route path="members" element={<MembersPage />} />
+              <Route path="import-historique" element={<HistoricalImportPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

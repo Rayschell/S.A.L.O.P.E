@@ -314,11 +314,18 @@ class MemberStatsEntry(BaseModel):
     model_config = {"from_attributes": True}
 
 
+BIEN_MEMBRE_SEUIL_HEURES = 10.0
+
+
 class MemberStatsRead(BaseModel):
     afterwork: List[MemberStatsEntry] = []
     soiree: List[MemberStatsEntry] = []
     afterwork_slot_labels: dict = {}  # heure_relative -> "HH:MM"
     soiree_slot_labels: dict = {}
+    total_heures_afterwork: float = 0.0
+    total_heures_soiree: float = 0.0
+    total_heures_cumule: float = 0.0
+    bien_membre: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -340,3 +347,55 @@ class TimelineEvent(BaseModel):
     type: str
     slots: List[TimelineSlot]
     total_heures: float
+
+
+# ---------------------------------------------------------------------------
+# Historical import (image grid format)
+# ---------------------------------------------------------------------------
+
+
+class HistoricalSlot(BaseModel):
+    heure_debut: str   # "HH:MM"
+    heure_fin: str     # "HH:MM"
+
+
+class HistoricalAssignment(BaseModel):
+    slot_index: int
+    type_affectation: str  # "staff" | "respo_bar"
+
+
+class HistoricalMemberRow(BaseModel):
+    csv_name: str
+    member_id: Optional[int] = None   # auto-resolved; None = unresolved
+    assignments: List[HistoricalAssignment]
+
+
+class HistoricalUnresolved(BaseModel):
+    csv_name: str
+    suggestions: List[NameSuggestion] = []
+
+
+class HistoricalPreviewResponse(BaseModel):
+    slots: List[HistoricalSlot]
+    members: List[HistoricalMemberRow]
+    unresolved: List[HistoricalUnresolved]
+
+
+class HistoricalResolveEntry(BaseModel):
+    csv_name: str
+    member_id: Optional[int] = None   # None + create_new=True → create
+    create_new: bool = False
+
+
+class HistoricalImportRequest(BaseModel):
+    event_nom: str
+    event_date: str         # YYYY-MM-DD
+    event_type: EventTypeEnum
+    slots: List[HistoricalSlot]
+    members: List[HistoricalMemberRow]
+    resolutions: List[HistoricalResolveEntry] = []
+
+
+class HistoricalImportResult(BaseModel):
+    event_id: int
+    assignments_created: int

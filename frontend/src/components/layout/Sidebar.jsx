@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { IconCalendarEvent, IconUsers, IconLogout } from '@tabler/icons-react'
+import { IconCalendarEvent, IconUsers, IconHistory, IconLogout } from '@tabler/icons-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 
 const SECTIONS = [
@@ -7,14 +7,16 @@ const SECTIONS = [
     label: 'Gestion',
     items: [
       { to: '/events', icon: IconCalendarEvent, label: 'Événements' },
-      { to: '/members', icon: IconUsers, label: 'Membres' },
+      { to: '/members', icon: IconUsers, label: 'Membres', bureauOnly: true },
+      { to: '/import-historique', icon: IconHistory, label: 'Import historique', bureauOnly: true },
     ],
   },
 ]
 
 export default function Sidebar() {
   const location = useLocation()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const isBureau = user?.roles?.includes('bureau') || user?.roles?.includes('admin')
 
   return (
     <aside
@@ -45,7 +47,7 @@ export default function Sidebar() {
           >
             {section.label}
           </p>
-          {section.items.map(({ to, icon: Icon, label }) => {
+          {section.items.filter(item => !item.bureauOnly || isBureau).map(({ to, icon: Icon, label }) => {
             const active = location.pathname.startsWith(to)
             return (
               <Link
