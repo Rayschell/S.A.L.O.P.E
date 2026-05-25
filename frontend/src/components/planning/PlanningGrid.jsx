@@ -120,7 +120,7 @@ export default function PlanningGrid({
 
   if (visibleMembers.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+      <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 15 }}>
         Aucune affectation. Lancez la génération automatique.
       </div>
     )
@@ -136,8 +136,7 @@ export default function PlanningGrid({
                 <th>Membre</th>
                 {slots.map((s) => (
                   <th key={s.id}>
-                    <div>{new Date(s.heure_debut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</div>
-                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, opacity: 0.75, fontWeight: 400 }}>
+                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 500 }}>
                       {fmtTime(s.heure_debut)}–{fmtTime(s.heure_fin)}
                     </div>
                   </th>
@@ -172,7 +171,7 @@ export default function PlanningGrid({
                             position: 'fixed', zIndex: 40,
                             left: editCell?.x ?? 0, top: (editCell?.y ?? 0),
                             background: 'var(--red-soft)', border: '1px solid rgba(240,82,82,0.3)',
-                            borderRadius: 'var(--radius-sm)', padding: '4px 8px', fontSize: 11,
+                            borderRadius: 'var(--radius-sm)', padding: '5px 10px', fontSize: 13,
                             color: 'var(--red)', whiteSpace: 'nowrap',
                           }}>
                             {cellError.message}
@@ -242,7 +241,7 @@ export default function PlanningGrid({
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, padding: '10px 14px 4px', flexWrap: 'wrap' }}>
         {!disabled && (
-          <span style={{ fontSize: 11, color: 'var(--accent)', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 14, color: 'var(--accent)', marginLeft: 'auto' }}>
             Cliquez sur une cellule pour modifier
           </span>
         )}
@@ -255,8 +254,8 @@ const editorBtn = (bg, color) => ({
   display: 'block',
   width: '100%',
   textAlign: 'left',
-  padding: '5px 10px',
-  fontSize: 11,
+  padding: '7px 12px',
+  fontSize: 14,
   background: bg,
   color,
   border: 'none',

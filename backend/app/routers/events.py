@@ -31,6 +31,7 @@ from ..schemas.schemas import (
     EventRead,
     EventReadDetail,
     EventUpdate,
+    GenerateRequest,
     GenerateResponse,
     RespoBarList,
     RespoBarRead,
@@ -447,11 +448,12 @@ def list_availabilities(
 @router.post("/{event_id}/generate", response_model=GenerateResponse)
 def generate(
     event_id: int,
+    body: GenerateRequest = GenerateRequest(),
     db: Session = Depends(get_db),
     _: Member = Depends(require_bureau),
 ):
     _get_event_or_404(db, event_id)
-    raw_warnings = generate_schedule(db, event_id)
+    raw_warnings = generate_schedule(db, event_id, excluded_member_ids=body.excluded_member_ids)
     warnings = [
         WarningItem(
             type=w.type,

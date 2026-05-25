@@ -7,18 +7,20 @@ import CsvImport from '../components/events/CsvImport.jsx'
 import RespoBarConfig from '../components/events/RespoBarConfig.jsx'
 import AffinityConfig from '../components/events/AffinityConfig.jsx'
 import SlotConfig from '../components/events/SlotConfig.jsx'
+import ParticipantsFilter from '../components/events/ParticipantsFilter.jsx'
 import PlanningGrid from '../components/planning/PlanningGrid.jsx'
 import WarningsList from '../components/planning/WarningsList.jsx'
 import Badge from '../components/ui/Badge.jsx'
 import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload } from '@tabler/icons-react'
 
-const TABS = ['import', 'config', 'respos', 'affinites', 'planning']
+const TABS = ['import', 'config', 'respos', 'affinites', 'participants', 'planning']
 const TAB_LABELS = {
   import: '1. Import CSV',
   config: '2. Créneaux',
   respos: '3. Respos bar',
   affinites: '4. Affinités',
-  planning: '5. Planning',
+  participants: '5. Participants',
+  planning: '6. Planning',
 }
 
 export default function EventDetailPage() {
@@ -35,9 +37,11 @@ export default function EventDetailPage() {
   const [resposBar, setResposBar] = useState([])
   const [availabilities, setAvailabilities] = useState([])
   const [warnings, setWarnings] = useState([])
+  const [excludedMemberIds, setExcludedMemberIds] = useState(new Set())
   const [tab, setTab] = useState('import')
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [exportingPng, setExportingPng] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const reload = async () => {
@@ -65,7 +69,7 @@ export default function EventDetailPage() {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const result = await eventsApi.generate(id)
+      const result = await eventsApi.generate(id, [...excludedMemberIds])
       setWarnings(result.warnings)
       setAssignments(result.assignments)
       setTab('planning')
@@ -82,6 +86,26 @@ export default function EventDetailPage() {
       setEvent(ev)
     } finally {
       setPublishing(false)
+    }
+  }
+
+  const handleExportPng = async () => {
+    setExportingPng(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch(`/api/events/${id}/export-png`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `planning-${id}.png`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExportingPng(false)
     }
   }
 
@@ -145,14 +169,14 @@ export default function EventDetailPage() {
                 {publishing ? 'Publication…' : 'Valider & publier'}
               </button>
             )}
-            <a
-              href={eventsApi.exportPngUrl(id)}
-              download={`planning-${id}.png`}
-              style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), textDecoration: 'none' }}
+            <button
+              onClick={handleExportPng}
+              disabled={exportingPng}
+              style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), opacity: exportingPng ? 0.5 : 1, cursor: exportingPng ? 'not-allowed' : 'pointer' }}
             >
               <IconDownload size={13} stroke={1.5} />
-              Export PNG
-            </a>
+              {exportingPng ? 'Export…' : 'Export PNG'}
+            </button>
           </div>
         )}
       </div>
@@ -205,6 +229,22 @@ export default function EventDetailPage() {
           members={members}
           affinities={affinities}
           onChanged={reload}
+          disabled={!isBureau || isPublished}
+        />
+      )}
+      {tab === 'participants' && (
+        <ParticipantsFilter
+          members={members}
+          availabilities={availabilities}
+          excludedIds={excludedMemberIds}
+          onToggle={(memberId) =>
+            setExcludedMemberIds((prev) => {
+              const next = new Set(prev)
+              if (next.has(memberId)) next.delete(memberId)
+              else next.add(memberId)
+              return next
+            })
+          }
           disabled={!isBureau || isPublished}
         />
       )}

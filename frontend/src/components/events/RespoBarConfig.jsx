@@ -42,14 +42,14 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+      <p style={{ fontSize: 15, color: 'var(--text-secondary)' }}>
         Optionnel. Désignez les respos bar dans l'ordre d'affectation.
         Si vide, la sélection est automatique (tri par shifts cumulés).
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ordered.length === 0 && (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', fontStyle: 'italic' }}>
             Aucun respo bar désigné (sélection automatique)
           </p>
         )}
@@ -69,12 +69,12 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
                 padding: '8px 12px',
               }}
             >
-              <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)', width: 16, textAlign: 'center' }}>
+              <span style={{ fontSize: 13, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)', width: 20, textAlign: 'center' }}>
                 {idx + 1}
               </span>
-              <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+              <span style={{ flex: 1, fontSize: 15, color: 'var(--text-primary)' }}>
                 {m.prenom} {m.nom}
-                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
+                <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
                   ({m.shifts_respo_bar_cumules} shifts)
                 </span>
               </span>
@@ -121,8 +121,8 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
               color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius-sm)',
-              padding: '7px 16px',
-              fontSize: 12,
+              padding: '9px 20px',
+              fontSize: 14,
               fontWeight: 500,
               cursor: saving ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.6 : 1,
@@ -155,8 +155,8 @@ const selectStyle = {
   background: 'var(--bg-elevated)',
   border: '1px solid var(--border-mid)',
   borderRadius: 'var(--radius-sm)',
-  padding: '7px 10px',
-  fontSize: 13,
+  padding: '9px 12px',
+  fontSize: 15,
   color: 'var(--text-primary)',
   outline: 'none',
   fontFamily: "'DM Sans', sans-serif",

@@ -36,7 +36,7 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+      <p style={{ fontSize: 15, color: 'var(--text-secondary)' }}>
         Indiquez les paires de membres qui souhaitent être sur le même créneau.
         Utilisé en critère de départage lors de la génération.
       </p>
@@ -44,7 +44,7 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
       {/* Existing affinities */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {affinities.length === 0 && (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', fontStyle: 'italic' }}>
             Aucune contrainte d'affinité définie.
           </p>
         )}
@@ -62,7 +62,7 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
             }}
           >
             <IconHeart size={12} stroke={1.5} color="var(--violet)" />
-            <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+            <span style={{ flex: 1, fontSize: 15, color: 'var(--text-primary)' }}>
               {getName(aff.membre_a_id)} &amp; {getName(aff.membre_b_id)}
             </span>
             {!disabled && (
@@ -72,8 +72,8 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
                   display: 'flex',
                   alignItems: 'center',
                   gap: 4,
-                  padding: '3px 8px',
-                  fontSize: 11,
+                  padding: '5px 10px',
+                  fontSize: 13,
                   background: 'var(--red-soft)',
                   color: 'var(--red)',
                   border: 'none',
@@ -134,7 +134,7 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
             Ajouter
           </button>
           {error && (
-            <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>
+            <span style={{ fontSize: 14, color: 'var(--red)' }}>{error}</span>
           )}
         </div>
       )}
@@ -144,7 +144,7 @@ export default function AffinityConfig({ eventId, members, affinities, onChanged
 
 const labelStyle = {
   display: 'block',
-  fontSize: 11,
+  fontSize: 13,
   color: 'var(--text-muted)',
   fontFamily: 'DM Mono, monospace',
   textTransform: 'uppercase',
@@ -156,8 +156,8 @@ const selectStyle = {
   background: 'var(--bg-elevated)',
   border: '1px solid var(--border-mid)',
   borderRadius: 'var(--radius-sm)',
-  padding: '7px 10px',
-  fontSize: 13,
+  padding: '9px 12px',
+  fontSize: 15,
   color: 'var(--text-primary)',
   outline: 'none',
   fontFamily: "'DM Sans', sans-serif",

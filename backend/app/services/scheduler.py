@@ -76,11 +76,18 @@ class _SlotAssignment:
 # ---------------------------------------------------------------------------
 
 
-def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
+def generate_schedule(
+    db: Session,
+    event_id: int,
+    excluded_member_ids: List[int] = [],
+) -> List[WarningItem]:
     """
     Generate (or regenerate) the automatic schedule for an event.
     Clears existing *auto* assignments and replaces them.
     Returns a list of WarningItem.
+
+    excluded_member_ids: members to skip entirely (not assigned by the solver,
+    but their manual assignments are kept).
     """
     event: Optional[Event] = db.query(Event).filter(Event.id == event_id).first()
     if event is None:
@@ -152,11 +159,15 @@ def generate_schedule(db: Session, event_id: int) -> List[WarningItem]:
         ).all():
             manual[(a.membre_id, slot_idx)] = a.type.value
 
-    # Members with at least one available slot
+    # Members with at least one available slot (excluding explicitly excluded ones)
+    excluded_set = set(excluded_member_ids)
     eligible_members = [
         m for m in all_members
-        if any(avail.get((m.id, s), "no") != "no" for s in range(n))
-        or any((m.id, s) in manual for s in range(n))
+        if m.id not in excluded_set
+        and (
+            any(avail.get((m.id, s), "no") != "no" for s in range(n))
+            or any((m.id, s) in manual for s in range(n))
+        )
     ]
     M = len(eligible_members)
     member_idx: Dict[int, int] = {m.id: i for i, m in enumerate(eligible_members)}

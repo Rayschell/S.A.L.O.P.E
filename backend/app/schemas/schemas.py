@@ -296,6 +296,10 @@ class WarningItem(BaseModel):
     message: str
 
 
+class GenerateRequest(BaseModel):
+    excluded_member_ids: List[int] = []
+
+
 class GenerateResponse(BaseModel):
     warnings: List[WarningItem]
     assignments: List[AssignmentRead]

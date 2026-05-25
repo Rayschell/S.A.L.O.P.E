@@ -138,6 +138,58 @@ def _find_col_seps(img: Image.Image, hdr_y1: int, hdr_y2: int, min_gap: int = 15
     return merged
 
 
+def _find_col_seps_ocr(img: Image.Image, hdr_y1: int, hdr_y2: int) -> List[int]:
+    """
+    OCR-based column detection. Used when header borders are invisible (e.g.
+    screenshots from the app which uses rgba(255,255,255,0.1) separators).
+
+    Runs Tesseract on the header row and groups detected words into cells
+    by horizontal proximity, then places separators at midpoints between
+    consecutive cell groups.
+    """
+    hdr_h = max(hdr_y2 - hdr_y1, 1)
+    header = img.crop((0, hdr_y1, img.width, hdr_y2))
+    scale = max(2, 80 // hdr_h)
+    header_up = header.resize((header.width * scale, header.height * scale), Image.LANCZOS)
+
+    data = pytesseract.image_to_data(
+        header_up, lang="fra+eng", config="--psm 11 --oem 3",
+        output_type=pytesseract.Output.DICT,
+    )
+
+    words: List[Tuple[int, int]] = []
+    for i, text in enumerate(data["text"]):
+        if not str(text).strip():
+            continue
+        raw_conf = data["conf"][i]
+        conf = int(raw_conf) if str(raw_conf).lstrip("-").isdigit() else -1
+        if conf < 0:
+            continue
+        x1 = data["left"][i] // scale
+        x2 = x1 + data["width"][i] // scale
+        words.append((x1, x2))
+
+    if len(words) < 2:
+        return []
+
+    words.sort()
+
+    # Merge words that are close together (same cell) into cell bounding boxes
+    gap_thr = max(10, img.width // 30)
+    cells: List[List[int]] = [[words[0][0], words[0][1]]]
+    for x1, x2 in words[1:]:
+        if x1 - cells[-1][1] < gap_thr:
+            cells[-1][1] = max(cells[-1][1], x2)
+        else:
+            cells.append([x1, x2])
+
+    if len(cells) < 2:
+        return []
+
+    # Separators at midpoints between consecutive cell groups
+    return [(cells[i][1] + cells[i + 1][0]) // 2 for i in range(len(cells) - 1)]
+
+
 def _find_row_seps(img: Image.Image, x1: int, x2: int, y1: int, y2: int, min_gap: int = 8) -> List[int]:
     """
     Find row separator y-positions in the body by looking for horizontal
@@ -165,6 +217,58 @@ def _find_row_seps(img: Image.Image, x1: int, x2: int, y1: int, y2: int, min_gap
         if not merged or s - merged[-1] >= min_gap:
             merged.append(s)
     return merged
+
+
+def _find_row_seps_ocr(
+    img: Image.Image,
+    name_x1: int,
+    name_x2: int,
+    body_y1: int,
+) -> List[int]:
+    """
+    OCR-based row detection. Used when row borders are invisible (app screenshots).
+    Runs Tesseract on the name column and uses text line positions to infer rows.
+    """
+    _, total_h = img.size
+    col_w = max(name_x2 - name_x1, 1)
+    col = img.crop((name_x1, body_y1, name_x2, total_h))
+    scale = max(2, 200 // col_w)
+    col_up = col.resize((col.width * scale, col.height * scale), Image.LANCZOS)
+
+    data = pytesseract.image_to_data(
+        col_up, lang="fra+eng", config="--psm 6 --oem 3",
+        output_type=pytesseract.Output.DICT,
+    )
+
+    # Group tokens into lines by (block, par, line) keys
+    line_ranges: Dict[tuple, List[int]] = {}
+    for i, text in enumerate(data["text"]):
+        if not str(text).strip():
+            continue
+        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
+        y_top = data["top"][i] // scale + body_y1
+        y_bot = y_top + data["height"][i] // scale
+        if key not in line_ranges:
+            line_ranges[key] = [y_top, y_bot]
+        else:
+            line_ranges[key][0] = min(line_ranges[key][0], y_top)
+            line_ranges[key][1] = max(line_ranges[key][1], y_bot)
+
+    if not line_ranges:
+        return []
+
+    sorted_lines = sorted(v for v in line_ranges.values())
+
+    # Merge lines that are very close (within 15px) = same logical row
+    merged: List[List[int]] = [list(sorted_lines[0])]
+    for y1, y2 in sorted_lines[1:]:
+        if y1 - merged[-1][1] < 15:
+            merged[-1][1] = max(merged[-1][1], y2)
+        else:
+            merged.append([y1, y2])
+
+    # Separators at midpoints between adjacent rows
+    return [(merged[i][1] + merged[i + 1][0]) // 2 for i in range(len(merged) - 1)]
 
 
 def _ranges_from_seps(seps: List[int], total: int, offset: int = 0) -> List[Tuple[int, int]]:
@@ -229,9 +333,15 @@ def parse_planning_image(img_bytes: bytes) -> Dict[str, Any]:
     hdr_y1, hdr_y2 = _find_header_bounds(img)
 
     # 2. Find column separators using blue-density profile in the header row.
-    #    Works for white, light-gray or dark separators between blue cells.
+    #    Works for Excel exports (white/visible borders).
     v_seps = _find_col_seps(img, hdr_y1, hdr_y2, min_gap=15)
     col_ranges = _ranges_from_seps(v_seps, w)
+
+    if len(col_ranges) < 2:
+        # Fallback: OCR word positions in the header (works for app screenshots
+        # where column borders are rgba(255,255,255,0.1) and invisible).
+        v_seps = _find_col_seps_ocr(img, hdr_y1, hdr_y2)
+        col_ranges = _ranges_from_seps(v_seps, w)
 
     if len(col_ranges) < 2:
         raise ValueError(
@@ -241,14 +351,20 @@ def parse_planning_image(img_bytes: bytes) -> Dict[str, Any]:
             "chaque créneau horaire a sa propre colonne."
         )
 
-    # 3. Find row separators (neutral-gray horizontal lines in the body).
+    # 3. Find row separators.
+    #    Try visible-border detection first (Excel), then OCR fallback (app screenshots
+    #    where row borders are rgba(255,255,255,0.07) and invisible).
+    name_col = col_ranges[0]
     h_seps = _find_row_seps(img, 0, w, hdr_y2, h, min_gap=8)
     row_ranges = _ranges_from_seps(h_seps, h, offset=hdr_y2)
 
     if not row_ranges:
+        h_seps = _find_row_seps_ocr(img, name_col[0], name_col[1], hdr_y2)
+        row_ranges = _ranges_from_seps(h_seps, h, offset=hdr_y2)
+
+    if not row_ranges:
         raise ValueError("Impossible de détecter les lignes de membres dans l'image.")
 
-    name_col = col_ranges[0]
     slot_cols = col_ranges[1:]
 
     # 4. OCR slot headers

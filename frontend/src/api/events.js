@@ -50,7 +50,8 @@ export const eventsApi = {
   listAvailabilities: (id) => client.get(`/events/${id}/availabilities`).then((r) => r.data),
 
   // Generate
-  generate: (id) => client.post(`/events/${id}/generate`).then((r) => r.data),
+  generate: (id, excludedMemberIds = []) =>
+    client.post(`/events/${id}/generate`, { excluded_member_ids: excludedMemberIds }).then((r) => r.data),
 
   // Export
   exportPngUrl: (id) => `/api/events/${id}/export-png`,

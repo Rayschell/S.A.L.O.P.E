@@ -37,7 +37,7 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+      <p style={{ fontSize: 15, color: 'var(--text-secondary)' }}>
         Définissez le nombre maximum de personnes par créneau.
       </p>
 
@@ -73,9 +73,9 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
                       background: 'var(--bg-elevated)',
                       border: '1px solid var(--border-mid)',
                       borderRadius: 'var(--radius-sm)',
-                      padding: '4px 8px',
+                      padding: '6px 8px',
                       textAlign: 'center',
-                      fontSize: 13,
+                      fontSize: 15,
                       color: 'var(--text-primary)',
                       outline: 'none',
                       fontFamily: 'DM Mono, monospace',
@@ -98,8 +98,8 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
               color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius-sm)',
-              padding: '7px 16px',
-              fontSize: 12,
+              padding: '9px 20px',
+              fontSize: 14,
               fontWeight: 500,
               cursor: saving ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.6 : 1,

@@ -40,7 +40,7 @@ export default function CsvImport({ eventId, onImported, disabled }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+        <p style={{ fontSize: 16, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           Importez un export CSV de meeting poll Strawpoll. Les noms seront automatiquement résolus
           via les alias connus (fuzzy matching). Les cas ambigus seront soumis à validation manuelle.
         </p>
@@ -52,8 +52,8 @@ export default function CsvImport({ eventId, onImported, disabled }) {
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            padding: '7px 12px',
-            fontSize: 12,
+            padding: '9px 14px',
+            fontSize: 14,
             background: 'var(--bg-high)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-sm)',
@@ -79,8 +79,8 @@ export default function CsvImport({ eventId, onImported, disabled }) {
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            padding: '7px 14px',
-            fontSize: 12,
+            padding: '9px 16px',
+            fontSize: 14,
             background: 'var(--violet)',
             color: '#fff',
             border: 'none',
@@ -102,8 +102,8 @@ export default function CsvImport({ eventId, onImported, disabled }) {
             background: 'var(--red-soft)',
             border: '1px solid rgba(240, 82, 82, 0.2)',
             borderRadius: 'var(--radius-sm)',
-            padding: '8px 12px',
-            fontSize: 12,
+            padding: '10px 14px',
+            fontSize: 14,
             color: 'var(--red)',
           }}
         >
@@ -117,8 +117,8 @@ export default function CsvImport({ eventId, onImported, disabled }) {
             background: 'var(--green-soft)',
             border: '1px solid rgba(52, 199, 123, 0.2)',
             borderRadius: 'var(--radius-sm)',
-            padding: '8px 12px',
-            fontSize: 12,
+            padding: '10px 14px',
+            fontSize: 14,
             color: 'var(--green)',
           }}
         >
