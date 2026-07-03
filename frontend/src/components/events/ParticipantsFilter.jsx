@@ -10,6 +10,7 @@ export default function ParticipantsFilter({
   availabilities,
   excludedIds,
   onToggle,
+  onClearAll,
   disabled,
 }) {
   // Members who have at least one availability entry for this event
@@ -44,8 +45,8 @@ export default function ParticipantsFilter({
           alignItems: 'center',
           gap: 6,
           padding: '5px 10px',
-          background: 'rgba(240,82,82,0.10)',
-          border: '1px solid rgba(240,82,82,0.25)',
+          background: 'rgba(240, 82, 82,0.10)',
+          border: '1px solid rgba(240, 82, 82,0.25)',
           borderRadius: 6,
           fontSize: 14,
           color: 'var(--red)',
@@ -54,7 +55,7 @@ export default function ParticipantsFilter({
           <IconUserOff size={13} stroke={1.5} />
           {excludedCount} membre{excludedCount > 1 ? 's' : ''} exclu{excludedCount > 1 ? 's' : ''}
           <button
-            onClick={() => respondents.forEach((m) => excludedIds.has(m.id) && onToggle(m.id))}
+            onClick={onClearAll}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', marginLeft: 4 }}
           >
             Tout réinclure
@@ -80,9 +81,9 @@ export default function ParticipantsFilter({
                 gap: 8,
                 padding: '7px 10px',
                 background: excluded
-                  ? 'rgba(240,82,82,0.08)'
+                  ? 'rgba(240, 82, 82,0.08)'
                   : 'var(--bg-elevated)',
-                border: `1px solid ${excluded ? 'rgba(240,82,82,0.30)' : 'var(--border)'}`,
+                border: `1px solid ${excluded ? 'rgba(240, 82, 82,0.30)' : 'var(--border)'}`,
                 borderRadius: 6,
                 cursor: disabled ? 'default' : 'pointer',
                 textAlign: 'left',
@@ -95,7 +96,7 @@ export default function ParticipantsFilter({
                 height: 18,
                 borderRadius: '50%',
                 border: `2px solid ${excluded ? 'var(--red)' : 'var(--border-mid)'}`,
-                background: excluded ? 'rgba(240,82,82,0.15)' : 'transparent',
+                background: excluded ? 'rgba(240, 82, 82,0.15)' : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

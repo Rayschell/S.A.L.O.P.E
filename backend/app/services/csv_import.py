@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -38,6 +38,8 @@ def _parse_slot_header(header: str) -> Optional[Tuple[datetime, datetime]]:
     fmt = "%Y-%m-%d %H:%M"
     start = datetime.strptime(f"{date_str} {start_str}", fmt)
     end = datetime.strptime(f"{date_str} {end_str}", fmt)
+    if end <= start:  # slot crossing midnight (e.g. 23:00 - 00:00)
+        end += timedelta(days=1)
     return start, end
 
 

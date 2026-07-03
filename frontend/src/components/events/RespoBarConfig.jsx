@@ -117,7 +117,7 @@ export default function RespoBarConfig({ eventId, members, resposBar, onSaved, d
             onClick={handleSave}
             disabled={saving}
             style={{
-              background: 'var(--violet)',
+              background: 'var(--accent)',
               color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius-sm)',

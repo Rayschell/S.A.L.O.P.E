@@ -7,7 +7,7 @@ import { IconUpload, IconCheck, IconX, IconAlertTriangle, IconHistory } from '@t
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CELL_COLOR = { staff: '#22543d', respo_bar: '#742a2a' }
-const CELL_BG    = { staff: 'rgba(52,199,123,0.22)', respo_bar: 'rgba(240,82,82,0.22)' }
+const CELL_BG    = { staff: 'rgba(52, 199, 123,0.22)', respo_bar: 'rgba(240, 82, 82,0.22)' }
 const CELL_LABEL = { staff: 'Staff', respo_bar: 'Respo' }
 
 // ── Step 1: upload + metadata form ───────────────────────────────────────────
@@ -88,7 +88,7 @@ function UploadStep({ onNext }) {
           padding: 28,
           textAlign: 'center',
           cursor: 'pointer',
-          background: file ? 'rgba(52,199,123,0.05)' : 'var(--bg-elevated)',
+          background: file ? 'rgba(52, 199, 123,0.05)' : 'var(--bg-elevated)',
           transition: 'all 180ms ease',
         }}
       >
@@ -207,15 +207,15 @@ function ValidateStep({ meta, parsed, onBack, onCommit }) {
         <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>{date}</span>
         <span style={{
           fontSize: 11, padding: '2px 8px', borderRadius: 99,
-          background: type === 'soiree' ? 'rgba(124,106,247,0.15)' : 'rgba(37,99,196,0.15)',
-          color: type === 'soiree' ? '#7c6af7' : '#2563c4',
+          background: type === 'soiree' ? 'rgba(124, 106, 247,0.15)' : 'rgba(91, 127, 166,0.15)',
+          color: type === 'soiree' ? '#7c6af7' : '#5b7fa6',
         }}>{type}</span>
         <button onClick={onBack} style={{ marginLeft: 'auto', ...btnGhostStyle }}>← Retour</button>
       </div>
 
       {/* Unresolved names */}
       {parsed.unresolved.length > 0 && (
-        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '10px 14px' }}>
+        <div style={{ background: 'rgba(245, 158, 11,0.08)', border: '1px solid rgba(245, 158, 11,0.25)', borderRadius: 8, padding: '10px 14px' }}>
           <p style={{ fontSize: 12, fontWeight: 500, color: '#f59e0b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <IconAlertTriangle size={14} stroke={1.5} /> {parsed.unresolved.length} nom(s) non reconnu(s) — choisissez ci-dessous
           </p>

@@ -51,7 +51,7 @@ export default function LoginPage() {
             style={{
               width: 28,
               height: 28,
-              background: 'var(--violet)',
+              background: 'var(--accent)',
               borderRadius: 8,
               display: 'flex',
               alignItems: 'center',
@@ -137,7 +137,7 @@ export default function LoginPage() {
             type="submit"
             disabled={loading}
             style={{
-              background: 'var(--violet)',
+              background: 'var(--accent)',
               color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius-sm)',

@@ -103,7 +103,7 @@ export default function NameResolutionModal({ pending, onResolved, onCancel }) {
                         name={`resolution-${idx}`}
                         checked={!res.create_new && res.member_id === s.member_id}
                         onChange={() => updateResolution(idx, { member_id: s.member_id, create_new: false })}
-                        style={{ accentColor: 'var(--violet)' }}
+                        style={{ accentColor: 'var(--accent)' }}
                       />
                       {s.display_name}
                       <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)' }}>
@@ -117,7 +117,7 @@ export default function NameResolutionModal({ pending, onResolved, onCancel }) {
                       name={`resolution-${idx}`}
                       checked={res.create_new}
                       onChange={() => updateResolution(idx, { create_new: true, member_id: null })}
-                      style={{ accentColor: 'var(--violet)' }}
+                      style={{ accentColor: 'var(--accent)' }}
                     />
                     + Créer un nouveau membre « {p.csv_name} »
                   </label>
@@ -161,7 +161,7 @@ const btnCancelStyle = {
 const btnConfirmStyle = {
   padding: '7px 14px',
   fontSize: 12,
-  background: 'var(--violet)',
+  background: 'var(--accent)',
   color: '#fff',
   border: 'none',
   borderRadius: 'var(--radius-sm)',

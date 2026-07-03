@@ -136,7 +136,7 @@ const btnCancelStyle = {
 const btnSubmitStyle = {
   padding: '7px 14px',
   fontSize: 12,
-  background: 'var(--violet)',
+  background: 'var(--accent)',
   color: '#fff',
   border: 'none',
   borderRadius: 'var(--radius-sm)',

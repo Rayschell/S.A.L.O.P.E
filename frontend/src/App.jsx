@@ -8,6 +8,7 @@ import MembersPage from './pages/MembersPage.jsx'
 import EventsPage from './pages/EventsPage.jsx'
 import EventDetailPage from './pages/EventDetailPage.jsx'
 import HistoricalImportPage from './pages/HistoricalImportPage.jsx'
+import Toaster from './components/ui/Toaster.jsx'
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      <Toaster />
     </ThemeProvider>
   )
 }

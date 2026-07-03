@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { membersApi } from '../../api/members.js'
-import { IconEye, IconEyeOff } from '@tabler/icons-react'
+import { IconEye, IconEyeOff, IconX, IconPlus } from '@tabler/icons-react'
 
 const ALL_ROLES = ['staff', 'bureau']
 
@@ -17,6 +17,57 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  const [aliases, setAliases] = useState([])
+  const [aliasInput, setAliasInput] = useState('')
+  const [aliasError, setAliasError] = useState('')
+
+  const [allMembers, setAllMembers] = useState([])
+  const [mergeTarget, setMergeTarget] = useState('')
+  const [merging, setMerging] = useState(false)
+
+  useEffect(() => {
+    if (!isEdit) return
+    membersApi.get(initial.id).then((m) => setAliases(m.aliases || []))
+    membersApi.list().then((list) => setAllMembers(list.filter((m) => m.id !== initial.id)))
+  }, [isEdit, initial?.id])
+
+  const loadAliases = () => membersApi.get(initial.id).then((m) => setAliases(m.aliases || []))
+
+  const handleAddAlias = async () => {
+    if (!aliasInput.trim()) return
+    setAliasError('')
+    try {
+      await membersApi.addAlias(initial.id, aliasInput.trim())
+      setAliasInput('')
+      await loadAliases()
+    } catch (err) {
+      setAliasError(err.response?.data?.detail || "Erreur lors de l'ajout.")
+    }
+  }
+
+  const handleDeleteAlias = async (aliasId) => {
+    await membersApi.deleteAlias(initial.id, aliasId)
+    await loadAliases()
+  }
+
+  const handleMerge = async () => {
+    if (!mergeTarget) return
+    const target = allMembers.find((m) => String(m.id) === String(mergeTarget))
+    if (!target) return
+    const ok = confirm(
+      `Fusionner "${target.prenom} ${target.nom}" dans "${initial.prenom} ${initial.nom}" ?\n\nLe membre sélectionné sera supprimé. Ses heures, disponibilités et alias seront transférés.`
+    )
+    if (!ok) return
+    setMerging(true)
+    try {
+      await membersApi.merge(initial.id, target.id)
+      onSaved()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Erreur lors de la fusion.')
+      setMerging(false)
+    }
+  }
 
   const toggleRole = (role) => {
     setForm((f) => ({
@@ -101,7 +152,7 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
                 type="checkbox"
                 checked={form.roles.includes(r)}
                 onChange={() => toggleRole(r)}
-                style={{ accentColor: 'var(--violet)', width: 14, height: 14 }}
+                style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
               />
               {r === 'staff' ? 'Staff' : 'Bureau'}
             </label>
@@ -120,8 +171,69 @@ export default function MemberForm({ initial, onSaved, onCancel }) {
         />
       </div>
 
+      {isEdit && (
+        <>
+          <div>
+            <label style={labelStyle}>Alias (imports CSV)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {aliases.length === 0
+                ? <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aucun alias</span>
+                : aliases.map((a) => (
+                  <span key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '3px 8px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {a.valeur}
+                    <button type="button" onClick={() => handleDeleteAlias(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                      <IconX size={11} stroke={1.5} />
+                    </button>
+                  </span>
+                ))
+              }
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="text"
+                value={aliasInput}
+                onChange={(e) => { setAliasInput(e.target.value); setAliasError('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddAlias() } }}
+                placeholder="Nouvel alias…"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button type="button" onClick={handleAddAlias} style={{ ...btnCancelStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <IconPlus size={12} stroke={1.5} />
+                Ajouter
+              </button>
+            </div>
+            {aliasError && <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--red)' }}>{aliasError}</p>}
+          </div>
+
+          <div style={{ border: '1px solid var(--red-soft)', borderRadius: 'var(--radius-sm)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>Fusionner un doublon</label>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Le membre sélectionné sera supprimé ; ses heures, dispos et alias seront transférés ici.</p>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select
+                value={mergeTarget}
+                onChange={(e) => setMergeTarget(e.target.value)}
+                style={{ ...inputStyle, flex: 1 }}
+              >
+                <option value="">— Sélectionner un doublon —</option>
+                {allMembers.map((m) => (
+                  <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!mergeTarget || merging}
+                onClick={handleMerge}
+                style={{ padding: '7px 14px', fontSize: 12, background: 'var(--red)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', cursor: mergeTarget ? 'pointer' : 'not-allowed', opacity: (!mergeTarget || merging) ? 0.5 : 1, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'nowrap' }}
+              >
+                {merging ? 'Fusion…' : 'Fusionner'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {error && (
-        <div style={{ background: 'var(--red-soft)', border: '1px solid rgba(240,82,82,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: 12, color: 'var(--red)' }}>
+        <div style={{ background: 'var(--red-soft)', border: '1px solid rgba(240, 82, 82,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: 12, color: 'var(--red)' }}>
           {error}
         </div>
       )}
@@ -172,7 +284,7 @@ const btnCancelStyle = {
 const btnSubmitStyle = {
   padding: '7px 14px',
   fontSize: 12,
-  background: 'var(--violet)',
+  background: 'var(--accent)',
   color: '#fff',
   border: 'none',
   borderRadius: 'var(--radius-sm)',

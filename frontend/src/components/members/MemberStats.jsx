@@ -7,7 +7,7 @@ export default function MemberStats({ stats, respoBar, maxRespoBar, isMemberBure
       {isMemberBureau && respoBar > 0 && (
         <RespoBarHistogram count={respoBar ?? 0} max={maxRespoBar ?? 1} />
       )}
-      <Histogram title="Afterwork" entries={stats.afterwork} colorRaw="#2563c4" slotLabels={stats.afterwork_slot_labels ?? {}} />
+      <Histogram title="Afterwork" entries={stats.afterwork} colorRaw="#5b7fa6" slotLabels={stats.afterwork_slot_labels ?? {}} />
       <Histogram title="Soirée" entries={stats.soiree} colorRaw="#7c6af7" slotLabels={stats.soiree_slot_labels ?? {}} />
       <Timeline events={timeline} />
     </div>
@@ -45,7 +45,7 @@ function HoursSummary({ stats }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <StatPill label="Afterwork" value={afterwork} color="#2563c4" />
+        <StatPill label="Afterwork" value={afterwork} color="#5b7fa6" />
         <StatPill label="Soirée" value={soiree} color="#7c6af7" />
         <StatPill label="Total" value={cumule} color={bienMembre ? '#f59e0b' : 'var(--text-primary)'} bold />
       </div>
@@ -110,7 +110,7 @@ function Histogram({ title, entries, colorRaw, slotLabels = {} }) {
     return (
       <div>
         <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>{title}</p>
-        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Aucune donnée</p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Aucun shift staffé pour l'instant</p>
       </div>
     )
   }
@@ -184,7 +184,7 @@ function Timeline({ events }) {
     return (
       <div>
         <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Historique</p>
-        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Aucun événement publié</p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Apparaîtra à la première publication d'un planning</p>
       </div>
     )
   }
@@ -220,8 +220,8 @@ function Timeline({ events }) {
                   borderRadius: 4,
                   flexShrink: 0,
                   fontWeight: 500,
-                  background: ev.type === 'afterwork' ? 'rgba(37,99,196,0.15)' : 'rgba(124,106,247,0.15)',
-                  color: ev.type === 'afterwork' ? '#2563c4' : '#7c6af7',
+                  background: ev.type === 'afterwork' ? 'rgba(91, 127, 166,0.15)' : 'rgba(124, 106, 247,0.15)',
+                  color: ev.type === 'afterwork' ? '#5b7fa6' : '#7c6af7',
                 }}>
                   {ev.type}
                 </span>

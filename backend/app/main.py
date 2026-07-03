@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth, events, export, import_historique, members
+from .routers import auth, events, export, import_historique, members, saisons
 
 app = FastAPI(title="S.A.L.O.P.E API", version="1.0.0", redirect_slashes=False)
 
@@ -22,6 +22,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(members.router)
 app.include_router(events.router)
+app.include_router(saisons.router)
 app.include_router(export.router)
 app.include_router(import_historique.router)
 

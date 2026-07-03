@@ -7,6 +7,7 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
     Object.fromEntries(slots.map((s) => [s.id, s.max_personnes]))
   )
   const [saving, setSaving] = useState(false)
+  const [applyAll, setApplyAll] = useState(3)
 
   const handleSave = async () => {
     setSaving(true)
@@ -40,6 +41,51 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
       <p style={{ fontSize: 15, color: 'var(--text-secondary)' }}>
         Définissez le nombre maximum de personnes par créneau.
       </p>
+
+      {!disabled && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+          Appliquer à tous :
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={applyAll}
+            onChange={(e) => setApplyAll(e.target.value)}
+            style={{
+              width: 60,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-mid)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '5px 8px',
+              textAlign: 'center',
+              fontSize: 14,
+              color: 'var(--text-primary)',
+              outline: 'none',
+              fontFamily: 'DM Mono, monospace',
+            }}
+          />
+          <button
+            onClick={() => {
+              const v = parseInt(applyAll, 10)
+              if (!Number.isNaN(v) && v >= 1) {
+                setMaxPersonnes(Object.fromEntries(slots.map((s) => [s.id, v])))
+              }
+            }}
+            style={{
+              background: 'var(--bg-high)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '5px 12px',
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            Appliquer
+          </button>
+        </div>
+      )}
 
       <div className="planning-wrapper">
         <table className="planning-table">
@@ -94,7 +140,7 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
             onClick={handleSave}
             disabled={saving}
             style={{
-              background: 'var(--violet)',
+              background: 'var(--accent)',
               color: '#fff',
               border: 'none',
               borderRadius: 'var(--radius-sm)',

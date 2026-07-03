@@ -5,18 +5,34 @@ Only truly hard constraint: R6 — max_personnes per slot must be respected exac
 (or as close as possible if not enough available members).
 
 Everything else is soft, expressed as weighted penalties in the objective:
-  P_understaffed  — slot has fewer than max_personnes (weight 10000)
-  P_no_bureau     — slot has no bureau member         (weight 500)
-  P_no_respo      — soirée slot has no respo bar      (weight 800)
-  P_long_pause    — member has a gap ≥3h between blocks (weight 200 per gap-hour)
-  P_medium_pause  — member has a gap of 2h             (weight 50)
-  P_quota_exceeded— member assigned > 2h               (weight 100 per extra hour)
-  P_imbalance     — difference between max and min hours assigned (weight 300)
-  P_maybe         — member placed on a "maybe" slot    (weight 30)
-  P_no_2h_block   — member has an isolated 1h assignment when 2h was feasible (weight 20)
+  P_understaffed  — slot has fewer than max_personnes      (weight 10000)
+  P_no_bureau     — slot has no bureau member              (weight 500)
+  P_no_respo      — soirée slot has no respo bar           (weight 800)
+  P_respo_isole   — respo covers a single slot, not a pair (weight 400)
+  P_long_pause    — gap ≥3h between blocks                 (weight 200 per gap-hour)
+  P_medium_pause  — gap of 2 slots                         (weight 150)
+  P_small_pause   — gap of 1 slot (2h actual pause)        (weight 60)
+  P_triple        — 3 consecutive slots                    (weight 500)
+  P_quota_3rd_h   — 3rd hour: bureau 80, non-bureau 300
+  P_quota_4th_h   — 4th hour and beyond                    (weight 600)
+  P_imbalance     — difference between max and min hours   (weight 300)
+  P_maybe         — member placed on a "maybe" slot        (weight 30)
+  P_equite        — member has staffed more than the least-staffed eligible
+                    member on past events of the same type (weight 8 per
+                    delta point, capped at 10, per assigned hour)
+  P_respo_rotation— respo candidate with more cumulated respo shifts than the
+                    least-served candidate (weight 15 per delta point, capped
+                    at 10, per respo slot)
+  R_consecutive   — reward for consecutive pairs            (weight −15)
 
-The solver finds the global optimum within a 10-second time limit, then falls back
+The solver finds the global optimum within the time limit, then falls back
 to the best solution found if the optimum is not proven.
+
+Two entry points:
+  generate_schedule  — solves once and persists the auto assignments.
+  generate_proposals — solves up to N times without writing anything; each
+                       new solution must differ from the previous ones by a
+                       Hamming distance ≥ 3 on the assignment cells.
 
 Warnings generated (same codes as before):
   W1 — no respo bar on a slot (soirée only)
@@ -29,8 +45,8 @@ Warnings generated (same codes as before):
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
@@ -48,6 +64,13 @@ from ..models.models import (
     Slot,
     StatsMemberHeureRelative,
 )
+
+
+BASE_QUOTA = 2  # hours before the over-quota penalties kick in
+
+# Fairness weights (see module docstring)
+W_EQUITE, EQUITE_CAP = 8, 10
+W_ROTATION, ROTATION_CAP = 15, 10
 
 
 # ---------------------------------------------------------------------------
@@ -71,24 +94,42 @@ class _SlotAssignment:
     maybe_force: bool = False
 
 
+@dataclass
+class _Context:
+    """Everything the solver needs, loaded once from the DB."""
+    event: Event
+    slots: List[Slot]                          # sorted by heure_debut
+    member_map: Dict[int, Member]
+    avail: Dict[Tuple[int, int], str]          # (member_id, slot_idx) -> statut
+    total_fois_staffe: Dict[int, int]          # per member, same event type
+    affinity_set: Set[Tuple[int, int]]         # bidirectional
+    respo_order: Dict[int, int]                # member_id -> ordre
+    manual: Dict[Tuple[int, int], str]         # (member_id, slot_idx) -> type
+    eligible_members: List[Member]
+    member_idx: Dict[int, int]                 # member_id -> index in eligible
+
+    @property
+    def n(self) -> int:
+        return len(self.slots)
+
+
+@dataclass
+class _Solution:
+    assignments: List[List[_SlotAssignment]]   # by slot idx, manual + auto
+    cells: Set[Tuple[int, int]] = field(default_factory=set)  # x[i][s] == 1
+    score: int = 0
+
+
 # ---------------------------------------------------------------------------
-# Public entry point
+# Context loading
 # ---------------------------------------------------------------------------
 
 
-def generate_schedule(
+def _load_context(
     db: Session,
     event_id: int,
-    excluded_member_ids: List[int] = [],
-) -> List[WarningItem]:
-    """
-    Generate (or regenerate) the automatic schedule for an event.
-    Clears existing *auto* assignments and replaces them.
-    Returns a list of WarningItem.
-
-    excluded_member_ids: members to skip entirely (not assigned by the solver,
-    but their manual assignments are kept).
-    """
+    excluded_member_ids: Sequence[int] = (),
+) -> _Context:
     event: Optional[Event] = db.query(Event).filter(Event.id == event_id).first()
     if event is None:
         raise ValueError(f"Event {event_id} not found")
@@ -97,9 +138,6 @@ def generate_schedule(
         db.query(Slot).filter(Slot.evenement_id == event_id).all(),
         key=lambda s: s.heure_debut,
     )
-    if not slots:
-        return [WarningItem(type="no_slots", message="Aucun créneau configuré")]
-
     n = len(slots)
     slot_id_to_idx: Dict[int, int] = {s.id: i for i, s in enumerate(slots)}
 
@@ -113,7 +151,7 @@ def generate_schedule(
         if idx is not None:
             avail[(av.membre_id, idx)] = av.statut.value
 
-    # Historical stats
+    # Historical stats (same event type) — feeds P_equite
     total_fois_staffe: Dict[int, int] = {m.id: 0 for m in all_members}
     for stat in db.query(StatsMemberHeureRelative).filter(
         StatsMemberHeureRelative.type_evenement == event.type
@@ -138,19 +176,7 @@ def generate_schedule(
         ).all()
     }
 
-    # ------------------------------------------------------------------
-    # Remove previous auto assignments
-    # ------------------------------------------------------------------
-    for slot in slots:
-        db.query(Assignment).filter(
-            Assignment.creneau_id == slot.id,
-            Assignment.source == AssignmentSourceEnum.auto,
-        ).delete(synchronize_session=False)
-    db.flush()
-
-    # ------------------------------------------------------------------
-    # Load manual assignments (fixed, not touched by solver)
-    # ------------------------------------------------------------------
+    # Manual assignments (fixed, not touched by solver)
     manual: Dict[Tuple[int, int], str] = {}  # (member_id, slot_idx) -> asgn_type
     for slot_idx, slot in enumerate(slots):
         for a in db.query(Assignment).filter(
@@ -169,12 +195,50 @@ def generate_schedule(
             or any((m.id, s) in manual for s in range(n))
         )
     ]
-    M = len(eligible_members)
     member_idx: Dict[int, int] = {m.id: i for i, m in enumerate(eligible_members)}
 
-    # ------------------------------------------------------------------
-    # Build CP-SAT model
-    # ------------------------------------------------------------------
+    return _Context(
+        event=event,
+        slots=slots,
+        member_map=member_map,
+        avail=avail,
+        total_fois_staffe=total_fois_staffe,
+        affinity_set=affinity_set,
+        respo_order=respo_order,
+        manual=manual,
+        eligible_members=eligible_members,
+        member_idx=member_idx,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Model building + solving
+# ---------------------------------------------------------------------------
+
+
+def _solve(
+    ctx: _Context,
+    *,
+    max_time: float = 15.0,
+    seed: Optional[int] = None,
+    forbidden: Sequence[Set[Tuple[int, int]]] = (),
+) -> Optional[_Solution]:
+    """
+    Build and solve the CP-SAT model. Pure function: no DB access, no writes.
+
+    forbidden: cell sets ((member_idx, slot_idx) at 1) of previously found
+    solutions; each new solution must differ by a Hamming distance ≥ 3.
+    Returns None if no feasible solution is found.
+    """
+    event = ctx.event
+    slots = ctx.slots
+    n = ctx.n
+    avail = ctx.avail
+    manual = ctx.manual
+    eligible_members = ctx.eligible_members
+    member_idx = ctx.member_idx
+    M = len(eligible_members)
+
     model = cp_model.CpModel()
 
     # x[i][s] = 1 if member i is assigned to slot s
@@ -194,6 +258,17 @@ def generate_schedule(
         for s in range(n):
             if avail.get((m.id, s), "no") == "no" and (m.id, s) not in manual:
                 model.add(x[i][s] == 0)
+
+    # Exclude previously found solutions (Hamming distance ≥ 3 on x cells)
+    for prev in forbidden:
+        diff_terms: List[cp_model.LinearExprT] = []
+        for i in range(M):
+            for s in range(n):
+                if (i, s) in prev:
+                    diff_terms.append(1 - x[i][s])
+                else:
+                    diff_terms.append(x[i][s])
+        model.add(sum(diff_terms) >= 3)
 
     # ------------------------------------------------------------------
     # Penalty variables
@@ -232,9 +307,9 @@ def generate_schedule(
     if event.type == EventTypeEnum.soiree:
         respo_candidates = [
             i for i, m in enumerate(eligible_members)
-            if m.id in respo_order or (m.roles and "bureau" in m.roles)
+            if m.id in ctx.respo_order or (m.roles and "bureau" in m.roles)
         ]
-        r: List[List[cp_model.IntVar]] = [
+        r: Optional[List[List[cp_model.IntVar]]] = [
             [model.new_bool_var(f"r_{i}_{s}") for s in range(n)]
             for i in range(M)
         ]
@@ -283,6 +358,22 @@ def generate_schedule(
                     model.add(isolated <= 1 - r[i][s + 1])
                 model.add(isolated >= r[i][s] - sum(adj))
                 penalties.append(400 * isolated)
+
+        # --- P_respo_rotation: favour candidates with the fewest cumulated
+        # respo shifts. Max 15×10=150 per slot < 400 (singleton) < 800
+        # (uncovered): rotation never degrades coverage.
+        if respo_candidates:
+            min_respo = min(
+                (eligible_members[i].shifts_respo_bar_cumules or 0)
+                for i in respo_candidates
+            )
+            for i in respo_candidates:
+                cumul = eligible_members[i].shifts_respo_bar_cumules or 0
+                delta = min(cumul - min_respo, ROTATION_CAP)
+                if delta > 0:
+                    penalties.append(
+                        W_ROTATION * delta * sum(r[i][s] for s in range(n))
+                    )
     else:
         r = None
 
@@ -341,13 +432,11 @@ def generate_schedule(
     # Progressive penalty:
     #   3rd hour (1st excess): bureau=80, non-bureau=300  → bureau preferred for first extension
     #   4th hour and beyond  : 600 for everyone           → strongly discourages stacking on one person
-    # This makes Bureau@4h (80+600=680) more expensive than Bureau@3h + NonBureau@3h (80+300=380).
-    base_quota = 2
     bureau_set = set(bureau_indices)
     for i in range(M):
         hours = sum(x[i][s] for s in range(n))
         excess = model.new_int_var(0, n, f"excess_{i}")
-        model.add(excess >= hours - base_quota)
+        model.add(excess >= hours - BASE_QUOTA)
         model.add(excess >= 0)
         # First extra hour (3rd): cheap for bureau, expensive for non-bureau
         weight_first = 80 if i in bureau_set else 300
@@ -378,6 +467,22 @@ def generate_schedule(
             if avail.get((m.id, s), "no") == "maybe" and (m.id, s) not in manual:
                 penalties.append(30 * x[i][s])
 
+    # --- P_equite: favour members who have staffed less on past events of the
+    # same type. Tie-breaker scale (8×cap 10 = max 80/h): below the structural
+    # penalties, above the consecutive-pair reward.
+    if M:
+        min_staffe = min(
+            ctx.total_fois_staffe.get(m.id, 0) for m in eligible_members
+        )
+        for i, m in enumerate(eligible_members):
+            delta = min(
+                ctx.total_fois_staffe.get(m.id, 0) - min_staffe, EQUITE_CAP
+            )
+            if delta > 0:
+                penalties.append(
+                    W_EQUITE * delta * sum(x[i][s] for s in range(n))
+                )
+
     # --- P_no_2h_block: prefer adjacent placements (soft R4) ---
     # Reward consecutive pairs: subtract penalty for each consecutive pair
     for i in range(M):
@@ -397,24 +502,23 @@ def generate_schedule(
     # Solve
     # ------------------------------------------------------------------
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 15.0
+    solver.parameters.max_time_in_seconds = max_time
     solver.parameters.num_search_workers = 4
+    if seed is not None:
+        solver.parameters.random_seed = seed
     status = solver.solve(model)
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        return [WarningItem(
-            type="solver_failed",
-            message="Le solveur n'a pas trouvé de solution. Vérifiez les disponibilités.",
-        )]
+        return None
 
     # ------------------------------------------------------------------
     # Extract solution
     # ------------------------------------------------------------------
     assignments: List[List[_SlotAssignment]] = [[] for _ in range(n)]
+    cells: Set[Tuple[int, int]] = set()
 
     # Manual assignments first
     for (mid, s), atype in manual.items():
-        m = member_map.get(mid)
         av_status = avail.get((mid, s), "no")
         assignments[s].append(_SlotAssignment(
             member_id=mid,
@@ -422,6 +526,8 @@ def generate_schedule(
             source="manuel",
             maybe_force=(av_status == "maybe"),
         ))
+        if mid in member_idx:
+            cells.add((member_idx[mid], s))
 
     # Auto assignments from solver
     respo_assigned: Set[Tuple[int, int]] = set()
@@ -434,9 +540,10 @@ def generate_schedule(
 
     for i, m in enumerate(eligible_members):
         for s in range(n):
-            if (m.id, s) in manual:
-                continue
             if solver.value(x[i][s]) == 1:
+                cells.add((i, s))
+                if (m.id, s) in manual:
+                    continue
                 atype = "respo_bar" if (m.id, s) in respo_assigned else "staff"
                 av_status = avail.get((m.id, s), "no")
                 assignments[s].append(_SlotAssignment(
@@ -446,9 +553,26 @@ def generate_schedule(
                     maybe_force=(av_status == "maybe"),
                 ))
 
-    # ------------------------------------------------------------------
-    # Persist auto assignments
-    # ------------------------------------------------------------------
+    return _Solution(
+        assignments=assignments,
+        cells=cells,
+        score=int(solver.objective_value),
+    )
+
+
+def _replace_auto_assignments(
+    db: Session,
+    slots: List[Slot],
+    assignments: List[List[_SlotAssignment]],
+) -> None:
+    """Delete previous auto assignments and persist the new ones."""
+    for slot in slots:
+        db.query(Assignment).filter(
+            Assignment.creneau_id == slot.id,
+            Assignment.source == AssignmentSourceEnum.auto,
+        ).delete(synchronize_session=False)
+    db.flush()
+
     for slot_idx, slot in enumerate(slots):
         for a in assignments[slot_idx]:
             if a.source != "auto":
@@ -462,13 +586,94 @@ def generate_schedule(
             ))
     db.commit()
 
-    # ------------------------------------------------------------------
-    # Generate warnings W1-W7
-    # ------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Public entry points
+# ---------------------------------------------------------------------------
+
+
+def generate_schedule(
+    db: Session,
+    event_id: int,
+    excluded_member_ids: List[int] = [],
+) -> List[WarningItem]:
+    """
+    Generate (or regenerate) the automatic schedule for an event.
+    Clears existing *auto* assignments and replaces them.
+    Returns a list of WarningItem.
+
+    excluded_member_ids: members to skip entirely (not assigned by the solver,
+    but their manual assignments are kept).
+    """
+    ctx = _load_context(db, event_id, excluded_member_ids)
+    if not ctx.slots:
+        return [WarningItem(type="no_slots", message="Aucun créneau configuré")]
+
+    solution = _solve(ctx, max_time=15.0)
+    if solution is None:
+        return [WarningItem(
+            type="solver_failed",
+            message="Le solveur n'a pas trouvé de solution. Vérifiez les disponibilités.",
+        )]
+
+    _replace_auto_assignments(db, ctx.slots, solution.assignments)
+
     return _generate_warnings(
-        event, slots, member_map, assignments, affinity_set,
-        solver, x, eligible_members, n, base_quota,
+        ctx.event, ctx.slots, ctx.member_map, solution.assignments,
+        ctx.affinity_set, ctx.eligible_members, BASE_QUOTA,
     )
+
+
+def generate_proposals(
+    db: Session,
+    event_id: int,
+    excluded_member_ids: List[int] = [],
+    count: int = 3,
+) -> List[dict]:
+    """
+    Solve up to `count` times without writing anything to the DB.
+    Each solution must differ from the previous ones (Hamming distance ≥ 3
+    on the assignment cells); stops early when no distinct solution remains.
+
+    Returns a list of proposals:
+      {index, score, warnings: List[WarningItem],
+       assignments: List[{creneau_id, membre_id, type, source, maybe_force}]}
+    """
+    ctx = _load_context(db, event_id, excluded_member_ids)
+    if not ctx.slots:
+        return []
+
+    proposals: List[dict] = []
+    forbidden: List[Set[Tuple[int, int]]] = []
+
+    for k in range(count):
+        solution = _solve(ctx, max_time=6.0, seed=1000 + k, forbidden=forbidden)
+        if solution is None:
+            break
+
+        flat: List[dict] = []
+        for slot_idx, slot in enumerate(ctx.slots):
+            for a in solution.assignments[slot_idx]:
+                flat.append({
+                    "creneau_id": slot.id,
+                    "membre_id": a.member_id,
+                    "type": a.asgn_type,
+                    "source": a.source,
+                    "maybe_force": a.maybe_force,
+                })
+
+        proposals.append({
+            "index": k,
+            "score": solution.score,
+            "warnings": _generate_warnings(
+                ctx.event, ctx.slots, ctx.member_map, solution.assignments,
+                ctx.affinity_set, ctx.eligible_members, BASE_QUOTA,
+            ),
+            "assignments": flat,
+        })
+        forbidden.append(solution.cells)
+
+    return proposals
 
 
 # ---------------------------------------------------------------------------
@@ -482,10 +687,7 @@ def _generate_warnings(
     member_map: Dict[int, Member],
     assignments: List[List[_SlotAssignment]],
     affinity_set: Set[Tuple[int, int]],
-    solver: cp_model.CpSolver,
-    x: List[List[cp_model.IntVar]],
     eligible_members: List[Member],
-    n: int,
     base_quota: int,
 ) -> List[WarningItem]:
     warnings: List[WarningItem] = []
@@ -540,7 +742,7 @@ def _generate_warnings(
             slot_indices_by_member.setdefault(a.member_id, set()).add(slot_idx)
 
     # W4
-    for i, m in enumerate(eligible_members):
+    for m in eligible_members:
         total_h = len(slot_indices_by_member.get(m.id, set()))
         if total_h > base_quota:
             warnings.append(WarningItem(

@@ -81,7 +81,7 @@ export default function CsvImport({ eventId, onImported, disabled }) {
             gap: 6,
             padding: '9px 16px',
             fontSize: 14,
-            background: 'var(--violet)',
+            background: 'var(--accent)',
             color: '#fff',
             border: 'none',
             borderRadius: 'var(--radius-sm)',

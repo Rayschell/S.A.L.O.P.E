@@ -1,3 +1,4 @@
+/* Thème « Granit » — zinc neutre, accent acier désaturé. */
 :root {
   --bg-base:        #111113;
   --bg-surface:     #18181b;
@@ -11,9 +12,11 @@
   --text-secondary: #b2b2bf;
   --text-muted:     #7e7e8c;
 
-  --accent:         #2563c4;
-  --accent-soft:    rgba(37, 99, 196, 0.15);
+  /* Acier — accent principal (boutons, liens, actif) */
+  --accent:         #5b7fa6;
+  --accent-soft:    rgba(91, 127, 166, 0.14);
 
+  /* Violet — bureau, affinités */
   --violet:         #7c6af7;
   --violet-soft:    rgba(124, 106, 247, 0.12);
 
@@ -44,9 +47,19 @@
   --text-secondary: #4a4a58;
   --text-muted:     #71717a;
 
-  --accent-soft:    rgba(37, 99, 196, 0.12);
+  /* Acier assombri pour le contraste sur fond clair */
+  --accent:         #47698e;
+  --accent-soft:    rgba(91, 127, 166, 0.14);
+
+  --violet:         #6553e0;
   --violet-soft:    rgba(124, 106, 247, 0.14);
+
+  --green:          #1f9d5e;
   --green-soft:     rgba(52, 199, 123, 0.16);
+
+  --red:            #d63b3b;
   --red-soft:       rgba(240, 82, 82, 0.13);
+
+  --amber:          #b97708;
   --amber-soft:     rgba(245, 158, 11, 0.13);
 }

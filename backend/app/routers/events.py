@@ -1,6 +1,7 @@
 """Events router — CRUD, CSV import, schedule generation, assignments."""
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -24,15 +25,21 @@ from ..models.models import (
 from ..schemas.schemas import (
     AffinityCreate,
     AffinityRead,
+    ApplyProposalRequest,
     AssignmentCreate,
     AssignmentRead,
     AssignmentUpdate,
     EventCreate,
+    EventDuplicateRequest,
     EventRead,
     EventReadDetail,
     EventUpdate,
+    ExclusionsUpdate,
+    GenerateProposalsRequest,
+    GenerateProposalsResponse,
     GenerateRequest,
     GenerateResponse,
+    ProposalItem,
     RespoBarList,
     RespoBarRead,
     SlotRead,
@@ -40,7 +47,11 @@ from ..schemas.schemas import (
     WarningItem,
 )
 from ..services import csv_import as csv_svc
-from ..services.scheduler import generate_schedule, check_manual_assignment
+from ..services.scheduler import (
+    check_manual_assignment,
+    generate_proposals,
+    generate_schedule,
+)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -111,6 +122,49 @@ def delete_event(
         raise HTTPException(status_code=404, detail="Event not found")
     db.delete(event)
     db.commit()
+
+
+@router.post(
+    "/{event_id}/duplicate",
+    response_model=EventRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def duplicate_event(
+    event_id: int,
+    payload: EventDuplicateRequest,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """
+    Copie nom/type/exclusions + créneaux (max_personnes inclus) décalés vers la
+    nouvelle date. Ne copie ni respos bar, ni affinités, ni disponibilités —
+    l'import CSV du nouveau Strawpoll matchera les créneaux par horaires exacts
+    et conservera les max_personnes copiés.
+    """
+    src = _get_event_or_404(db, event_id)
+    new_event = Event(
+        nom=payload.nom or f"{src.nom} (copie)",
+        date=payload.date,
+        type=src.type,
+        excluded_member_ids=list(src.excluded_member_ids or []),
+    )
+    db.add(new_event)
+    db.flush()
+
+    # Décalage en jours entiers : les créneaux passant minuit restent cohérents
+    delta = timedelta(days=(payload.date.date() - src.date.date()).days)
+    for slot in db.query(Slot).filter(Slot.evenement_id == event_id).all():
+        db.add(Slot(
+            evenement_id=new_event.id,
+            heure_debut=slot.heure_debut + delta,
+            heure_fin=slot.heure_fin + delta,
+            heure_relative=slot.heure_relative,
+            max_personnes=slot.max_personnes,
+        ))
+
+    db.commit()
+    db.refresh(new_event)
+    return new_event
 
 
 # ---------------------------------------------------------------------------
@@ -452,7 +506,7 @@ def generate(
     db: Session = Depends(get_db),
     _: Member = Depends(require_bureau),
 ):
-    _get_event_or_404(db, event_id)
+    event = _get_event_or_404(db, event_id)
     raw_warnings = generate_schedule(db, event_id, excluded_member_ids=body.excluded_member_ids)
     warnings = [
         WarningItem(
@@ -463,6 +517,10 @@ def generate(
         )
         for w in raw_warnings
     ]
+    # Persist exclusions + warnings so they survive a page reload
+    event.excluded_member_ids = body.excluded_member_ids
+    event.last_warnings = [w.model_dump() for w in warnings]
+    db.commit()
     slot_ids = [
         s.id
         for s in db.query(Slot).filter(Slot.evenement_id == event_id).all()
@@ -473,6 +531,100 @@ def generate(
         .all()
     )
     return GenerateResponse(warnings=warnings, assignments=assignments)
+
+
+@router.post("/{event_id}/generate-proposals", response_model=GenerateProposalsResponse)
+def generate_proposals_endpoint(
+    event_id: int,
+    body: GenerateProposalsRequest = GenerateProposalsRequest(),
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """Résout plusieurs variantes SANS rien écrire en base (mode preview)."""
+    event = _get_event_or_404(db, event_id)
+    if event.statut == EventStatutEnum.publie:
+        raise HTTPException(status_code=400, detail="Event already published")
+    count = max(2, min(body.count, 3))
+    raw = generate_proposals(
+        db, event_id, excluded_member_ids=body.excluded_member_ids, count=count
+    )
+    proposals = [
+        ProposalItem(
+            index=p["index"],
+            score=p["score"],
+            warnings=[
+                WarningItem(
+                    type=w.type,
+                    slot_id=w.slot_id,
+                    member_id=w.member_id,
+                    message=w.message,
+                )
+                for w in p["warnings"]
+            ],
+            assignments=p["assignments"],
+        )
+        for p in raw
+    ]
+    return GenerateProposalsResponse(proposals=proposals)
+
+
+@router.post("/{event_id}/apply-proposal", response_model=GenerateResponse)
+def apply_proposal(
+    event_id: int,
+    body: ApplyProposalRequest,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """Applique une proposition choisie : remplace les affectations auto."""
+    event = _get_event_or_404(db, event_id)
+    if event.statut == EventStatutEnum.publie:
+        raise HTTPException(status_code=400, detail="Event already published")
+
+    slot_ids = {
+        s.id for s in db.query(Slot).filter(Slot.evenement_id == event_id).all()
+    }
+    for a in body.assignments:
+        if a.creneau_id not in slot_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Créneau {a.creneau_id} n'appartient pas à cet événement",
+            )
+
+    db.query(Assignment).filter(
+        Assignment.creneau_id.in_(slot_ids),
+        Assignment.source == AssignmentSourceEnum.auto,
+    ).delete(synchronize_session=False)
+    db.flush()
+
+    # Les affectations manuelles restent en base telles quelles ; on n'insère
+    # que les entrées auto, en sautant les cellules déjà occupées (uq_assignment)
+    manual_cells = {
+        (a.creneau_id, a.membre_id)
+        for a in db.query(Assignment)
+        .filter(Assignment.creneau_id.in_(slot_ids))
+        .all()
+    }
+    for a in body.assignments:
+        if a.source != AssignmentSourceEnum.auto:
+            continue
+        if (a.creneau_id, a.membre_id) in manual_cells:
+            continue
+        db.add(Assignment(
+            creneau_id=a.creneau_id,
+            membre_id=a.membre_id,
+            type=a.type,
+            source=AssignmentSourceEnum.auto,
+            maybe_force=a.maybe_force,
+        ))
+
+    event.excluded_member_ids = body.excluded_member_ids
+    event.last_warnings = [w.model_dump() for w in body.warnings]
+    db.commit()
+
+    assignments = (
+        db.query(Assignment).filter(Assignment.creneau_id.in_(slot_ids)).all()
+    )
+    return GenerateResponse(warnings=body.warnings, assignments=assignments)
 
 
 # ---------------------------------------------------------------------------
@@ -486,7 +638,10 @@ def publish_event(
     db: Session = Depends(get_db),
     _: Member = Depends(require_bureau),
 ):
-    event = _get_event_or_404(db, event_id)
+    # Verrou de ligne : deux publications simultanées ne doivent pas doubler les compteurs
+    event = db.query(Event).filter(Event.id == event_id).with_for_update().first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
     if event.statut == EventStatutEnum.publie:
         raise HTTPException(status_code=400, detail="Event already published")
 
@@ -539,6 +694,77 @@ def publish_event(
     db.commit()
     db.refresh(event)
     return event
+
+
+@router.post("/{event_id}/unpublish", response_model=EventRead)
+def unpublish_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """Reverse of publish: decrement the counters incremented at publication."""
+    event = db.query(Event).filter(Event.id == event_id).with_for_update().first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.statut != EventStatutEnum.publie:
+        raise HTTPException(status_code=400, detail="Event is not published")
+
+    slots_map = {
+        s.id: s
+        for s in db.query(Slot).filter(Slot.evenement_id == event_id).all()
+    }
+    assignments = (
+        db.query(Assignment)
+        .filter(Assignment.creneau_id.in_(list(slots_map.keys())))
+        .all()
+    )
+
+    respo_bar_members: set = set()
+    for a in assignments:
+        if a.type == AssignmentTypeEnum.respo_bar:
+            respo_bar_members.add(a.membre_id)
+        slot = slots_map.get(a.creneau_id)
+        if not slot:
+            continue
+        stat = (
+            db.query(StatsMemberHeureRelative)
+            .filter_by(
+                membre_id=a.membre_id,
+                type_evenement=event.type,
+                heure_relative=slot.heure_relative,
+            )
+            .first()
+        )
+        if stat and stat.fois_staffe > 0:
+            stat.fois_staffe -= 1
+
+    for member_id in respo_bar_members:
+        member = db.query(Member).filter(Member.id == member_id).first()
+        if member and (member.shifts_respo_bar_cumules or 0) > 0:
+            member.shifts_respo_bar_cumules -= 1
+
+    event.statut = EventStatutEnum.brouillon
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+# ---------------------------------------------------------------------------
+# Exclusions (members skipped by the solver)
+# ---------------------------------------------------------------------------
+
+
+@router.put("/{event_id}/exclusions", response_model=List[int])
+def set_exclusions(
+    event_id: int,
+    body: ExclusionsUpdate,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    event = _get_event_or_404(db, event_id)
+    event.excluded_member_ids = body.member_ids
+    db.commit()
+    return event.excluded_member_ids
 
 
 # ---------------------------------------------------------------------------

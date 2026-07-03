@@ -1,9 +1,9 @@
 """FastAPI dependency helpers."""
 from __future__ import annotations
 
-from typing import Generator
+from typing import Generator, Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,8 @@ from ..core.security import decode_token
 from ..database import SessionLocal
 from ..models.models import Member
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# auto_error=False : le token peut aussi venir du cookie httpOnly
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -23,7 +24,8 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def get_current_member(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> Member:
     credentials_exc = HTTPException(
@@ -31,7 +33,10 @@ def get_current_member(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    member_id = decode_token(token, expected_type="access")
+    raw = token or request.cookies.get("access_token")
+    if raw is None:
+        raise credentials_exc
+    member_id = decode_token(raw, expected_type="access")
     if member_id is None:
         raise credentials_exc
     member = db.query(Member).filter(Member.id == member_id).first()

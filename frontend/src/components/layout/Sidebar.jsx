@@ -63,6 +63,7 @@ export default function Sidebar() {
                   textDecoration: 'none',
                   color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                   background: active ? 'var(--bg-high)' : 'transparent',
+                  boxShadow: active ? 'inset 2px 0 0 var(--accent)' : 'none',
                   transition: 'background 120ms ease, color 120ms ease',
                 }}
               >

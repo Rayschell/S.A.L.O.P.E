@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ALLOWED_EMAIL_DOMAIN: str = "lateb.eu"
     FUZZY_MATCH_THRESHOLD: int = 90
     CORS_ORIGINS: str = "http://localhost:3000"
+    COOKIE_SECURE: bool = False  # True en prod (HTTPS)
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

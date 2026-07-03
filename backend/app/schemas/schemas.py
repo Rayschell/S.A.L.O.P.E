@@ -1,7 +1,7 @@
 """Pydantic schemas for request/response validation."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
@@ -23,16 +23,6 @@ from ..models.models import (
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +84,14 @@ class AliasRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AliasCreate(BaseModel):
+    valeur: str
+
+
+class MergeRequest(BaseModel):
+    source_member_id: int
+
+
 # Rebuild forward reference
 MemberReadFull.model_rebuild()
 
@@ -139,8 +137,19 @@ class EventRead(BaseModel):
 
 class EventReadDetail(EventRead):
     slots: List[SlotRead] = []
+    excluded_member_ids: List[int] = []
+    last_warnings: Optional[List[dict]] = None
 
     model_config = {"from_attributes": True}
+
+
+class ExclusionsUpdate(BaseModel):
+    member_ids: List[int] = []
+
+
+class EventDuplicateRequest(BaseModel):
+    nom: Optional[str] = None  # défaut : "<nom source> (copie)"
+    date: datetime
 
 
 # ---------------------------------------------------------------------------
@@ -305,9 +314,85 @@ class GenerateResponse(BaseModel):
     assignments: List[AssignmentRead]
 
 
+class ProposalAssignment(BaseModel):
+    creneau_id: int
+    membre_id: int
+    type: AssignmentTypeEnum
+    source: AssignmentSourceEnum
+    maybe_force: bool = False
+
+
+class ProposalItem(BaseModel):
+    index: int
+    score: int
+    warnings: List[WarningItem]
+    assignments: List[ProposalAssignment]
+
+
+class GenerateProposalsRequest(BaseModel):
+    excluded_member_ids: List[int] = []
+    count: int = 3  # clampé à [2, 3] dans le routeur
+
+
+class GenerateProposalsResponse(BaseModel):
+    proposals: List[ProposalItem]
+
+
+class ApplyProposalRequest(BaseModel):
+    assignments: List[ProposalAssignment]
+    warnings: List[WarningItem] = []
+    excluded_member_ids: List[int] = []
+
+
+# ---------------------------------------------------------------------------
+# Saison (mandat de bureau)
+# ---------------------------------------------------------------------------
+
+
+class SaisonCreate(BaseModel):
+    nom: str
+    date_debut: date
+    date_fin: Optional[date] = None  # None = saison en cours (pas de fin)
+
+    @field_validator("date_fin")
+    @classmethod
+    def validate_dates(cls, v: Optional[date], info) -> Optional[date]:
+        debut = info.data.get("date_debut")
+        if v is not None and debut is not None and v <= debut:
+            raise ValueError("date_fin doit être postérieure à date_debut")
+        return v
+
+
+class SaisonUpdate(BaseModel):
+    nom: Optional[str] = None
+    date_debut: Optional[date] = None
+    date_fin: Optional[date] = None
+
+
+class SaisonRead(BaseModel):
+    id: int
+    nom: str
+    date_debut: date
+    date_fin: Optional[date] = None
+
+    model_config = {"from_attributes": True}
+
+
 # ---------------------------------------------------------------------------
 # Member stats
 # ---------------------------------------------------------------------------
+
+
+class MemberOverviewItem(BaseModel):
+    id: int
+    nom: str
+    prenom: str
+    roles: List[str]
+    heures_afterwork: float
+    heures_soiree: float
+    heures_total: float
+    shifts_respo_bar_cumules: int
+    bien_membre: bool
 
 
 class MemberStatsEntry(BaseModel):

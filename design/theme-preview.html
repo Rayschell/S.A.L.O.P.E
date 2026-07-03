@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="comptoir">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.A.L.O.P.E — Prévisualisation des thèmes</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+/* ============ THÈMES ============ */
+/* 1. Fond de comptoir (actuel) — sombre chaud, laiton */
+[data-theme="comptoir"] {
+  --bg-base:#14100d; --bg-surface:#1b1612; --bg-elevated:#241d17; --bg-high:#2e2620;
+  --border:rgba(243,236,226,.07); --border-mid:rgba(243,236,226,.13);
+  --text-primary:#f3ece2; --text-secondary:#c4b8a8; --text-muted:#8a7d6d;
+  --accent:#b97f36; --accent-soft:rgba(185,127,54,.14);
+  --green:#46a374; --green-soft:rgba(70,163,116,.13);
+  --red:#c14953; --red-soft:rgba(193,73,83,.14);
+  --amber:#e5c15a; --amber-soft:rgba(229,193,90,.10);
+  --violet:#b0567a;
+  --font-display:'Bricolage Grotesque';
+}
+/* 2. Papier de caisse (le mode clair actuel) */
+[data-theme="papier"] {
+  --bg-base:#efe9df; --bg-surface:#f9f5ec; --bg-elevated:#e7dfd2; --bg-high:#ddd3c2;
+  --border:rgba(60,45,20,.12); --border-mid:rgba(60,45,20,.22);
+  --text-primary:#241d17; --text-secondary:#55483a; --text-muted:#857662;
+  --accent:#8f5f1e; --accent-soft:rgba(143,95,30,.14);
+  --green:#2e7d52; --green-soft:rgba(46,125,82,.15);
+  --red:#a63d47; --red-soft:rgba(166,61,71,.13);
+  --amber:#9a7716; --amber-soft:rgba(154,119,22,.13);
+  --violet:#954d6b;
+  --font-display:'Bricolage Grotesque';
+}
+/* 3. Encre — clair galerie, un seul accent vert profond, ultra sobre */
+[data-theme="encre"] {
+  --bg-base:#faf9f7; --bg-surface:#ffffff; --bg-elevated:#f1efeb; --bg-high:#e6e3dd;
+  --border:rgba(28,27,26,.10); --border-mid:rgba(28,27,26,.20);
+  --text-primary:#1c1b1a; --text-secondary:#4c4a46; --text-muted:#8b8781;
+  --accent:#2f6b4f; --accent-soft:rgba(47,107,79,.10);
+  --green:#2f6b4f; --green-soft:rgba(47,107,79,.12);
+  --red:#9e3b32; --red-soft:rgba(158,59,50,.10);
+  --amber:#8a6d1f; --amber-soft:rgba(138,109,31,.12);
+  --violet:#6d5a8e;
+  --font-display:'Instrument Serif';
+}
+/* 4. Ardoise — sombre vert-de-gris désaturé, calme */
+[data-theme="ardoise"] {
+  --bg-base:#141816; --bg-surface:#191e1b; --bg-elevated:#212724; --bg-high:#2a322e;
+  --border:rgba(220,232,224,.07); --border-mid:rgba(220,232,224,.14);
+  --text-primary:#e8ede9; --text-secondary:#b3bfb7; --text-muted:#79857d;
+  --accent:#8fb09a; --accent-soft:rgba(143,176,154,.12);
+  --green:#6fae86; --green-soft:rgba(111,174,134,.13);
+  --red:#c96f66; --red-soft:rgba(201,111,102,.13);
+  --amber:#d3b264; --amber-soft:rgba(211,178,100,.10);
+  --violet:#a083b8;
+  --font-display:'Bricolage Grotesque';
+}
+/* 5. Minuit — bleu nuit désaturé, accent vieil or */
+[data-theme="minuit"] {
+  --bg-base:#12151d; --bg-surface:#171b25; --bg-elevated:#1f2431; --bg-high:#293043;
+  --border:rgba(226,230,240,.07); --border-mid:rgba(226,230,240,.14);
+  --text-primary:#e9ebf1; --text-secondary:#b4bac9; --text-muted:#7b8296;
+  --accent:#c2ab72; --accent-soft:rgba(194,171,114,.12);
+  --green:#5eab84; --green-soft:rgba(94,171,132,.13);
+  --red:#cd6672; --red-soft:rgba(205,102,114,.13);
+  --amber:#dfb765; --amber-soft:rgba(223,183,101,.10);
+  --violet:#9a86c9;
+  --font-display:'Instrument Serif';
+}
+/* 6. Granit — le zinc d'origine, assagi (accent acier désaturé) */
+[data-theme="granit"] {
+  --bg-base:#111113; --bg-surface:#18181b; --bg-elevated:#1f1f23; --bg-high:#27272c;
+  --border:rgba(255,255,255,.07); --border-mid:rgba(255,255,255,.12);
+  --text-primary:#f5f4f5; --text-secondary:#b2b2bf; --text-muted:#7e7e8c;
+  --accent:#5b7fa6; --accent-soft:rgba(91,127,166,.14);
+  --green:#34c77b; --green-soft:rgba(52,199,123,.12);
+  --red:#f05252; --red-soft:rgba(240,82,82,.12);
+  --amber:#f59e0b; --amber-soft:rgba(245,158,11,.08);
+  --violet:#7c6af7;
+  --font-display:'DM Sans';
+}
+
+/* ============ BASE ============ */
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg-base); color:var(--text-primary);
+  font-family:'DM Sans',sans-serif; font-size:15px;
+  -webkit-font-smoothing:antialiased;
+  transition:background-color 250ms ease,color 250ms ease;
+  padding:24px 32px 60px;
+}
+h1,h2 { font-family:var(--font-display),'DM Sans',sans-serif; letter-spacing:-0.01em; font-weight:600; }
+
+/* Switcher */
+.switcher { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.switcher button {
+  padding:7px 14px; font-size:13px; font-family:'DM Sans',sans-serif;
+  border-radius:999px; border:1px solid var(--border-mid);
+  background:var(--bg-surface); color:var(--text-secondary); cursor:pointer;
+}
+.switcher button.active { background:var(--accent); color:#fff; border-color:transparent; }
+.swatches { display:flex; gap:6px; align-items:center; margin-bottom:28px; }
+.swatches span { width:22px; height:22px; border-radius:5px; border:1px solid var(--border-mid); display:inline-block; }
+.swatches code { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); margin-left:8px; }
+
+/* Composants maquettés */
+.page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+.badge {
+  display:inline-block; padding:2px 8px; border-radius:3px;
+  font-size:11px; font-family:'DM Mono',monospace; font-weight:500;
+  text-transform:uppercase; letter-spacing:.08em; transform:rotate(-1.5deg); opacity:.92;
+}
+.badge.green { color:var(--green); border:1.5px solid var(--green); background:var(--green-soft); }
+.badge.amber { color:var(--amber); border:1.5px solid var(--amber); background:var(--amber-soft); }
+.badge.plain { color:var(--text-muted); border:1.5px solid var(--text-muted); background:transparent; }
+.btn {
+  display:inline-flex; align-items:center; gap:6px; padding:8px 14px;
+  font-size:13px; font-weight:500; font-family:'DM Sans',sans-serif;
+  border:none; border-radius:6px; cursor:pointer;
+}
+.btn.primary { background:var(--accent); color:#fff; }
+.btn.success { background:var(--green); color:#fff; }
+.btn.ghost { background:var(--bg-high); color:var(--text-secondary); border:1px solid var(--border); }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.card { background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:12px; }
+.card .label { font-size:11px; font-family:'DM Mono',monospace; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+.card .value { font-size:20px; font-weight:600; font-family:var(--font-display),'DM Sans',sans-serif; }
+.tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.tabs span { padding:8px 16px; font-size:14px; color:var(--text-muted); cursor:pointer; }
+.tabs span.active { color:var(--text-primary); font-weight:500; border-bottom:2px solid var(--accent); margin-bottom:-1px; }
+.warn { display:flex; align-items:center; gap:8px; background:var(--amber-soft); border:1px solid var(--border); border-radius:6px; padding:10px 14px; font-size:12.5px; color:var(--amber); margin-bottom:16px; }
+
+.grid-wrap { background:var(--bg-surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+thead th {
+  background:var(--bg-high); color:var(--text-primary); font-weight:500;
+  padding:14px; text-align:center; border-right:1px solid var(--border);
+  border-bottom:2px solid var(--accent); font-family:'DM Mono',monospace; font-size:13px;
+}
+thead th:first-child { text-align:left; font-family:'DM Sans',sans-serif; }
+tbody td { padding:12px; text-align:center; border-bottom:1px solid var(--border); border-right:1px solid var(--border); background:var(--bg-surface); color:var(--text-secondary); }
+tbody td:first-child { text-align:left; color:var(--text-primary); }
+.c-staff { background:var(--green-soft); color:var(--green); font-weight:600; font-size:13px; }
+.c-respo { background:var(--red-soft); color:var(--red); font-weight:600; font-size:13px; }
+.c-yes { background:var(--green-soft); opacity:.45; }
+.c-maybe { background:var(--amber-soft); }
+.c-no { background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--border) 6px,var(--border) 8px); }
+tfoot td { background:var(--bg-elevated); font-family:'DM Mono',monospace; font-size:15px; padding:14px; text-align:center; }
+tfoot td:first-child { text-align:left; font-family:'DM Sans',sans-serif; font-weight:500; }
+.ok { color:var(--green); } .under { color:var(--amber); }
+.dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--violet); margin-left:5px; vertical-align:middle; }
+.note { margin-top:26px; font-size:13px; color:var(--text-muted); line-height:1.7; }
+</style>
+</head>
+<body>
+  <div class="switcher" id="switcher"></div>
+  <div class="swatches" id="swatches"></div>
+
+  <div class="page-header">
+    <div>
+      <h1 style="font-size:22px; display:inline-block; margin-right:12px;">Soirée du 12 juillet</h1>
+      <span class="badge green">Publié</span>
+      <span class="badge plain">Soirée</span>
+      <p style="font-size:13px; color:var(--text-muted); margin-top:6px;">12 juillet 2026 · 7 créneaux · 8 staffé·e·s</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn primary">▶ Générer</button>
+      <button class="btn success">✓ Valider &amp; publier</button>
+      <button class="btn ghost">⬇ Export PNG</button>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><p class="label">Heures cumulées</p><p class="value">142 h</p></div>
+    <div class="card"><p class="label">Bien membré·e·s</p><p class="value" style="color:var(--green)">11 ✦</p></div>
+    <div class="card"><p class="label">Respos bar</p><p class="value" style="color:var(--red)">23</p></div>
+    <div class="card"><p class="label">Événements publiés</p><p class="value">17</p></div>
+  </div>
+
+  <div class="tabs">
+    <span>1. Import CSV ✓</span><span>2. Créneaux ✓</span><span>3. Respos bar</span><span class="active">6. Planning</span>
+  </div>
+
+  <div class="warn">⚠ 1 créneau sous-staffé : 22:00 (1/2)</div>
+
+  <div class="grid-wrap">
+    <table>
+      <thead><tr><th>Membre</th><th>19:00–20:00</th><th>20:00–21:00</th><th>21:00–22:00</th><th>22:00–23:00</th><th>Heures</th></tr></thead>
+      <tbody>
+        <tr><td>Gurvan Biguet</td><td class="c-staff">Staff</td><td class="c-yes"></td><td class="c-staff">Staff</td><td class="c-no"></td><td style="font-family:'DM Mono',monospace; color:var(--text-muted)">2 h</td></tr>
+        <tr><td>Lenny Chiadmi<span class="dot"></span></td><td class="c-no"></td><td class="c-respo">Respo</td><td class="c-respo">Respo</td><td class="c-yes"></td><td style="font-family:'DM Mono',monospace; color:var(--text-muted)">2 h</td></tr>
+        <tr><td>Lilian Hatton<span class="dot"></span></td><td class="c-yes"></td><td class="c-staff">Staff</td><td class="c-maybe"></td><td class="c-staff">Staff</td><td style="font-family:'DM Mono',monospace; color:var(--text-muted)">2 h</td></tr>
+        <tr><td>Enzo Soler</td><td class="c-staff">Staff</td><td class="c-no"></td><td class="c-yes"></td><td class="c-yes"></td><td style="font-family:'DM Mono',monospace; color:var(--text-muted)">1 h</td></tr>
+      </tbody>
+      <tfoot><tr><td>Staffés / max</td><td class="ok">2/2</td><td class="ok">2/2</td><td class="ok">3/3</td><td class="under">1/2</td><td></td></tr></tfoot>
+    </table>
+  </div>
+
+  <p class="note">
+    Cette page est une maquette statique des composants réels de l'app (tampon de statut, onglets, StatCards, grille).
+    Change de thème en haut — les valeurs hex de la palette s'affichent sous les boutons.
+    Le thème choisi se transpose dans <code>frontend/src/styles/theme.css</code>.
+  </p>
+
+<script>
+const THEMES = {
+  comptoir: 'Fond de comptoir (actuel)',
+  papier:   'Papier de caisse (clair actuel)',
+  encre:    'Encre (clair galerie)',
+  ardoise:  'Ardoise (sombre vert-de-gris)',
+  minuit:   'Minuit (bleu nuit + vieil or)',
+  granit:   'Granit (zinc assagi)',
+}
+const KEYS = ['--bg-base','--bg-surface','--text-primary','--accent','--green','--red','--amber']
+const sw = document.getElementById('switcher')
+const sws = document.getElementById('swatches')
+function render() {
+  const cur = document.documentElement.dataset.theme
+  sw.innerHTML = ''
+  Object.entries(THEMES).forEach(([k, label]) => {
+    const b = document.createElement('button')
+    b.textContent = label
+    b.className = k === cur ? 'active' : ''
+    b.onclick = () => { document.documentElement.dataset.theme = k; render() }
+    sw.appendChild(b)
+  })
+  const cs = getComputedStyle(document.documentElement)
+  sws.innerHTML = KEYS.map(k => `<span style="background:${cs.getPropertyValue(k)}" title="${k}"></span>`).join('')
+    + `<code>${KEYS.map(k => cs.getPropertyValue(k).trim()).join(' · ')}</code>`
+}
+render()
+</script>
+</body>
+</html>

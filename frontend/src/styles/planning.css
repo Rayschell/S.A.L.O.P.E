@@ -9,17 +9,19 @@
 .planning-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: 16px;
 }
 
+/* En-tête « ardoise » : sombre mat, horaires à la craie */
 .planning-table thead th {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-high);
+  color: var(--text-primary);
   font-weight: 500;
-  font-size: 14px;
-  padding: 18px 14px;
+  font-size: 15px;
+  padding: 20px 16px;
   text-align: center;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid var(--border);
+  border-bottom: 2px solid var(--accent);
   white-space: nowrap;
   font-family: 'DM Sans', sans-serif;
 }
@@ -31,7 +33,7 @@
 .planning-table thead th:last-child { border-right: none; }
 
 .planning-table tbody td {
-  padding: 14px 12px;
+  padding: 17px 14px;
   text-align: center;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -41,8 +43,8 @@
 .planning-table tbody td:first-child {
   text-align: left;
   color: var(--text-primary);
-  font-size: 15px;
-  padding-left: 16px;
+  font-size: 16px;
+  padding-left: 18px;
   border-right: 1px solid var(--border);
 }
 .planning-table tbody td:last-child { border-right: none; }
@@ -50,23 +52,23 @@
 .planning-table tbody tr:hover td { background: var(--bg-elevated); }
 
 .cell-staff {
-  background: var(--green-soft) !important;
+  background: rgba(52, 199, 123, 0.24) !important;
   color: var(--green) !important;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .cell-respo {
-  background: var(--red-soft) !important;
+  background: rgba(240, 82, 82, 0.20) !important;
   color: var(--red) !important;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 /* Light mode: stronger backgrounds + darker text for WCAG AA contrast */
 [data-theme="light"] .cell-staff {
-  background: rgba(52, 199, 123, 0.22) !important;
-  color: #1a6e3f !important;
+  background: rgba(52, 199, 123, 0.34) !important;
+  color: #14572f !important;
 }
 [data-theme="light"] .cell-respo {
   background: rgba(240, 82, 82, 0.20) !important;
@@ -87,9 +89,9 @@
 .planning-table tfoot td {
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: 19px;
   font-family: 'DM Mono', monospace;
-  padding: 20px 12px;
+  padding: 22px 14px;
   text-align: center;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -103,3 +105,159 @@
   border-right: 1px solid var(--border);
 }
 .planning-table tfoot td:last-child { border-right: none; }
+
+/* Sticky member column */
+.planning-table th:first-child,
+.planning-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+.planning-table thead th:first-child { z-index: 3; }
+
+/* Availability tint on empty cells */
+.planning-table tbody td.cell-dispo-yes { background: rgba(52, 199, 123, 0.13); }
+[data-theme="light"] .planning-table tbody td.cell-dispo-yes { background: rgba(52, 199, 123, 0.18); }
+.planning-table tbody td.cell-dispo-maybe { background: rgba(245, 158, 11, 0.08); }
+.planning-table tbody td.cell-dispo-no {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(255, 255, 255, 0.04) 6px,
+    rgba(255, 255, 255, 0.04) 8px
+  );
+}
+[data-theme="light"] .planning-table tbody td.cell-dispo-no {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(0, 0, 0, 0.05) 6px,
+    rgba(0, 0, 0, 0.05) 8px
+  );
+}
+
+/* Manual assignment marker */
+.manual-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Warning highlight (cell + column header) */
+.planning-table td.cell-highlight,
+.planning-table th.th-highlight {
+  outline: 2px solid var(--violet);
+  outline-offset: -2px;
+}
+
+/* Drag & drop */
+.planning-table tbody td.cell-drop-ok {
+  background: var(--accent-soft) !important;
+  outline: 1px dashed var(--accent);
+  outline-offset: -3px;
+}
+.planning-table tbody td.cell-drag-source {
+  opacity: 0.45;
+}
+.planning-table tbody td[draggable="true"] {
+  cursor: grab;
+}
+
+/* Footer staffing status */
+.planning-table tfoot td.foot-under { color: var(--amber); }
+.planning-table tfoot td.foot-over { color: var(--red); }
+.planning-table tfoot td.foot-full { color: var(--green); }
+
+/* Hours column */
+.planning-table .col-hours {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* Variante « member-table » : table membres + stats, plus dense que  */
+/* la grille de planning, sélection de ligne visible.                 */
+/* ------------------------------------------------------------------ */
+.planning-table.member-table {
+  font-size: 14px;
+}
+.planning-table.member-table thead th {
+  padding: 12px 14px;
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-mid);
+  border-right: none;
+}
+.planning-table.member-table tbody td {
+  padding: 11px 14px;
+  border-right: none;
+  font-size: 14px;
+}
+.planning-table.member-table tbody td:first-child {
+  font-size: 14px;
+  border-right: none;
+}
+.planning-table.member-table tbody tr.row-selected td {
+  background: var(--accent-soft);
+}
+.planning-table.member-table tbody tr.row-selected td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Variante « mini-planning » : grilles compactes de la modale de      */
+/* comparaison de variantes (3 plannings côte à côte).                 */
+/* ------------------------------------------------------------------ */
+.planning-table.mini-planning {
+  font-size: 11px;
+}
+.planning-table.mini-planning thead th {
+  padding: 7px 8px;
+  font-size: 10.5px;
+  font-family: 'DM Mono', monospace;
+  border-bottom-width: 1px;
+}
+.planning-table.mini-planning thead th:first-child {
+  min-width: 110px;
+  padding-left: 10px;
+  font-family: 'DM Sans', sans-serif;
+}
+.planning-table.mini-planning tbody td {
+  padding: 5px 8px;
+  font-size: 10.5px;
+  min-width: 34px;
+}
+.planning-table.mini-planning tbody td:first-child {
+  font-size: 11.5px;
+  padding-left: 10px;
+  white-space: nowrap;
+}
+.planning-table.mini-planning .cell-staff,
+.planning-table.mini-planning .cell-respo {
+  font-size: 10.5px;
+}
+.planning-table.mini-planning .manual-dot {
+  top: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+}
+.planning-table.mini-planning tfoot td {
+  padding: 6px 8px;
+  font-size: 10.5px;
+}
+.planning-table.mini-planning tfoot td:first-child {
+  padding-left: 10px;
+  font-size: 10.5px;
+}

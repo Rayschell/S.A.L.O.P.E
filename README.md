@@ -1,79 +1,105 @@
 # S.A.L.O.P.E
 
-Application de gestion de planning de shifts pour bar associatif.
+Application de gestion de plannings de shifts pour bar associatif (LATEB).
+
+Elle couvre le cycle complet d'un événement : import des disponibilités depuis Strawpoll, génération optimisée du planning (solveur CP-SAT), ajustements manuels, publication avec comptabilisation des heures, export PNG — plus le suivi des statistiques de staff par membre et par saison (mandat de bureau).
+
+---
+
+## Sommaire
+
+- [Fonctionnalités](#fonctionnalités)
+- [Architecture](#architecture)
+- [Développement local](#développement-local)
+- [Tests & CI](#tests--ci)
+- [Workflow utilisateur](#workflow-utilisateur)
+- [Génération de planning](#génération-de-planning)
+- [Saisons (mandats de bureau)](#saisons-mandats-de-bureau)
+- [Page Membres](#page-membres)
+- [Import de planning historique](#import-de-planning-historique)
+- [Modèle de données (résumé)](#modèle-de-données-résumé)
+- [Déploiement en production (K3s)](#déploiement-en-production-k3s)
+- [Variables d'environnement backend](#variables-denvironnement-backend)
+- [Structure du projet](#structure-du-projet)
+
+---
+
+## Fonctionnalités
+
+- **Événements** : création, édition, duplication (créneaux + exclusions copiés), suppression. Deux types : `afterwork` et `soiree`.
+- **Import CSV Strawpoll** : parsing de l'export, résolution des noms par alias + fuzzy matching, validation manuelle des cas ambigus.
+- **Génération de planning** : solveur CP-SAT (OR-Tools) avec contraintes dures et pénalités pondérées ; mode « propositions » pour comparer plusieurs variantes avant d'appliquer ; exclusion de membres de la génération.
+- **Ajustements manuels** : modification/suppression d'affectations cellule par cellule dans la grille.
+- **Publication / dépublication** : la publication incrémente les compteurs de stats (`fois_staffe`, respo bar) ; la dépublication les décrémente proprement.
+- **Warnings (W1–W7)** : anomalies détectées sur le planning généré (créneau sans respo bar, sous-staffing, absence de membre bureau, dépassement de quota, « peut-être » utilisé, affinité insatisfaite, longue pause).
+- **Export PNG** : image du planning prête à partager.
+- **Saisons** : découpage des stats par mandat de bureau, avec saison en cours sans date de fin.
+- **Membres** : CRUD, rôles (`staff` / `bureau`), alias de noms, fusion de doublons, remise à zéro des compteurs, stats détaillées et timeline par membre, badge « Bien membré·e·s ».
+- **Import historique** : OCR d'anciennes grilles de planning (captures Excel/Sheets) pour comptabiliser rétroactivement les heures.
 
 ---
 
 ## Architecture
 
 ```
-frontend/   React 18 + Vite + Tailwind CSS — servi par nginx
-backend/    Python 3.12 + FastAPI + SQLAlchemy + Alembic
+frontend/   React 18 + Vite — dev :3000, servi par nginx en prod
+backend/    Python 3.12 + FastAPI + SQLAlchemy + Alembic — API sous /api/*
 k8s/        Manifests Kubernetes pour K3s (OVH VPS)
+.github/    CI GitHub Actions (build frontend + pytest backend)
 ```
 
----
-
-## Prérequis locaux
-
-- Docker avec le plugin `docker compose` (v2+) installé
-- kubectl configuré sur votre cluster K3s (pour le déploiement prod uniquement)
-- cert-manager installé dans le cluster (avec un `ClusterIssuer` nommé `letsencrypt-prod`)
+Auth par JWT (access + refresh token) ; les mutations sensibles exigent le rôle `bureau`. Le vocabulaire métier est en français dans le code (`creneau`, `heure_relative`, `fois_staffe`, `membre_id`…).
 
 ---
 
-## Développement local avec Docker
+## Développement local
 
-Le `docker-compose.yml` fournit un environnement complet avec **hot-reload** sur le backend et le frontend.
-
-### Démarrage
+Prérequis : Docker avec le plugin `docker compose` (v2+).
 
 ```bash
 # Premier lancement — build les images et applique les migrations
 docker compose up --build
 
-# Lancement suivants (images déjà buildées)
+# Lancements suivants
 docker compose up
 ```
 
 | Service | URL | Hot-reload |
 |---|---|---|
-| Frontend (Vite) | http://localhost:3000 | Oui — tout changement dans `frontend/src/` est reflété instantanément |
-| Backend (uvicorn) | http://localhost:8000 | Oui — tout changement dans `backend/app/` redémarre le serveur |
-| API docs | http://localhost:8000/docs | — |
+| Frontend (Vite) | http://localhost:3000 | Oui — `frontend/src/` monté en live |
+| Backend (uvicorn) | http://localhost:8000 | Oui — `backend/app/` monté en live |
+| API docs (Swagger) | http://localhost:8000/docs | — |
 | PostgreSQL | localhost:**5433** | — |
 
 > Le port PostgreSQL est exposé sur **5433** côté hôte (5432 est généralement occupé par un Postgres local). Les conteneurs communiquent entre eux via le réseau Docker interne sur le port 5432.
 >
-> Les migrations Alembic sont appliquées automatiquement au démarrage via le service `migrations`.
+> Les migrations Alembic sont appliquées automatiquement au démarrage via le service one-shot `migrations`.
 
 ### Commandes utiles
 
 ```bash
-# Voir les logs d'un service
+# Logs d'un service
 docker compose logs -f backend
 docker compose logs -f frontend
 
 # Relancer les migrations manuellement (ex. après une nouvelle migration)
 docker compose run --rm migrations
 
-# Accéder au shell d'un conteneur
+# Shell dans un conteneur
 docker compose exec backend bash
 docker compose exec postgres psql -U baruser -d salope
 
 # Connexion Postgres depuis l'hôte
 psql -h localhost -p 5433 -U baruser salope
 
-# Arrêter et supprimer les conteneurs (les données postgres sont conservées)
+# Arrêter (les données postgres sont conservées) / tout supprimer
 docker compose down
-
-# Tout supprimer y compris le volume postgres
 docker compose down -v
 ```
 
 ### Premier utilisateur bureau
 
-Après le premier `docker compose up`, créer le compte admin :
+Après le premier `docker compose up` :
 
 ```bash
 docker compose exec backend python -c "
@@ -96,168 +122,99 @@ print('Membre créé, id =', m.id)
 
 ---
 
-## Modèle de données (résumé)
+## Tests & CI
 
-### Member
-
-| Colonne | Type | Description |
-|---|---|---|
-| `nom`, `prenom`, `email` | String | Identité |
-| `roles` | String[] | `staff` et/ou `bureau` |
-| `shifts_respo_bar_cumules` | Integer | Nombre de fois respo bar sur événements publiés |
-
-### StatsMemberHeureRelative
-
-Statistiques par membre × type d'événement × heure relative (index du créneau).
-
-| Colonne | Type | Description |
-|---|---|---|
-| `membre_id` | FK → members | |
-| `type_evenement` | Enum | `afterwork` / `soiree` |
-| `heure_relative` | Integer | Index du créneau (0, 1, 2…) |
-| `fois_disponible` | Integer | Nombre de fois disponible à ce créneau |
-| `fois_staffe` | Integer | Nombre de fois staffé à ce créneau |
-
-### Badge « Bien membré·e·s »
-
-Un membre atteint le statut **Bien membré·e·s** dès qu'il cumule **≥ 10 heures** de staff sur l'ensemble des événements publiés (afterworks + soirées confondus). Ce total est calculé à la volée à partir des assignments publiés.
-
----
-
-## Build des images Docker (production)
-
-Remplacez `your-registry` par votre registry Docker Hub / GitHub Container Registry / etc.
+La suite de tests backend vit dans `backend/tests/` (pytest + TestClient FastAPI). Elle utilise une base dédiée `salope_test` créée automatiquement sur le Postgres de dev.
 
 ```bash
-# Backend
-docker build -t your-registry/salope-backend:latest ./backend
-
-# Frontend
-docker build -t your-registry/salope-frontend:latest ./frontend
-
-# Push
-docker push your-registry/salope-backend:latest
-docker push your-registry/salope-frontend:latest
+# Avec la stack docker compose démarrée (Postgres accessible sur :5433) :
+docker compose run --rm --no-deps \
+  -v ./backend/tests:/app/tests \
+  -v ./backend/app:/app/app \
+  -v ./backend/requirements-dev.txt:/app/requirements-dev.txt \
+  -e TEST_DATABASE_URL=postgresql://baruser:barpassword@postgres:5432/salope_test \
+  backend bash -c "pip install -q -r requirements-dev.txt && pytest tests -v"
 ```
 
----
+La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque push/PR :
 
-## Déploiement sur K3s (OVH VPS)
-
-### 1. Préparer les secrets
-
-Éditez `k8s/secret.yaml` pour remplacer les valeurs base64 par les vôtres :
-
-```bash
-# Exemple de génération
-echo -n 'votre-mot-de-passe-postgres' | base64
-openssl rand -base64 32 | tr -d '\n' | base64   # pour SECRET_KEY
-```
-
-### 2. Adapter la configuration
-
-Dans `k8s/configmap.yaml` et `k8s/ingress.yaml`, remplacez :
-- Domaine configuré : `lateb.eu` (frontend sur `planning.lateb.eu`)
-
-Dans `k8s/backend-deployment.yaml` et `k8s/frontend-deployment.yaml`, remplacez :
-- `your-registry/salope-backend:latest` → votre image
-
-### 3. Appliquer les manifests
-
-```bash
-# Namespace + secrets + config (dans cet ordre)
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/configmap.yaml
-
-# Stockage PostgreSQL
-kubectl apply -f k8s/postgres-pvc.yaml
-kubectl apply -f k8s/postgres-deployment.yaml
-kubectl apply -f k8s/postgres-service.yaml
-
-# Migrations (attendre que postgres soit prêt)
-kubectl apply -f k8s/migrations-job.yaml
-kubectl wait --for=condition=complete job/salope-migrations -n salope --timeout=120s
-
-# Backend
-kubectl apply -f k8s/backend-deployment.yaml
-kubectl apply -f k8s/backend-service.yaml
-
-# Frontend
-kubectl apply -f k8s/frontend-deployment.yaml
-kubectl apply -f k8s/frontend-service.yaml
-
-# Ingress (Traefik + TLS via cert-manager)
-kubectl apply -f k8s/ingress.yaml
-```
-
-### 4. Vérification
-
-```bash
-kubectl get pods -n salope
-kubectl get ingress -n salope
-kubectl describe certificate salope-tls -n salope
-```
-
-### 5. Créer le premier utilisateur bureau
-
-Depuis un pod backend :
-
-```bash
-kubectl exec -it deploy/salope-backend -n salope -- python -c "
-from app.database import SessionLocal
-from app.models.models import Member
-from app.core.security import hash_password
-db = SessionLocal()
-m = Member(
-    nom='Nom',
-    prenom='Prénom',
-    email='admin@lateb.eu',
-    roles=['staff', 'bureau'],
-    hashed_password=hash_password('motdepasse')
-)
-db.add(m)
-db.commit()
-print('Membre créé, id =', m.id)
-"
-```
-
----
-
-## Variables d'environnement backend
-
-| Variable | Description | Défaut |
-|---|---|---|
-| `DATABASE_URL` | URL PostgreSQL | `postgresql://...` |
-| `SECRET_KEY` | Clé JWT (≥ 32 chars) | _à changer_ |
-| `ALLOWED_EMAIL_DOMAIN` | Domaine email autorisé | `lateb.eu` |
-| `CORS_ORIGINS` | Origins CORS autorisées | `http://localhost:3000` |
-| `FUZZY_MATCH_THRESHOLD` | Seuil fuzzy matching (0-100) | `90` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée access token | `30` |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | Durée refresh token | `7` |
+- **Frontend build** : `npm ci` + `vite build`
+- **Backend tests** : pytest contre un Postgres 16 de service
 
 ---
 
 ## Workflow utilisateur
 
-1. **Login** — email + mot de passe (domaine restreint à `lateb.eu`)
-2. **Créer un événement** — nom, date, type (Soirée / Afterwork)
+1. **Login** — email + mot de passe (domaine restreint, `lateb.eu` par défaut)
+2. **Créer un événement** — nom, date, type (Soirée / Afterwork) — ou **dupliquer** un événement existant
 3. **Importer le CSV Strawpoll** — résolution automatique des noms via alias + fuzzy matching ; validation manuelle des cas ambigus
 4. **Configurer les créneaux** — définir le `max_personnes` par créneau
 5. _(Soirée)_ **Désigner les respos bar** — optionnel, dans l'ordre souhaité
-6. **Saisir les affinités** — paires de membres qui souhaitent se retrouver ensemble
-7. **Générer le planning** — algorithme à escalade automatique avec règles R1-R6
-8. **Ajustements manuels** — cliquer sur une cellule pour modifier une affectation
-9. **Valider & publier** — incrémente `fois_staffe` par créneau et `shifts_respo_bar_cumules`
+6. **Saisir les affinités** — paires de membres qui souhaitent être ensemble
+7. **Générer le planning** — génération directe, ou plusieurs **propositions** comparées côte à côte avant d'en appliquer une ; possibilité d'**exclure des membres** de la génération
+8. **Ajustements manuels** — cliquer sur une cellule pour modifier ou retirer une affectation
+9. **Publier** — incrémente `fois_staffe` par créneau et `shifts_respo_bar_cumules` (la **dépublication** annule ces compteurs)
 10. **Exporter en PNG** — image prête à partager
+
+---
+
+## Génération de planning
+
+Le planning est résolu par un solveur **CP-SAT (OR-Tools)** :
+
+- **Contrainte dure** : `max_personnes` par créneau.
+- **Pénalités pondérées** : créneau sans respo bar, sans membre bureau, sous-staffé ; dépassement du quota de base (2 h) ; utilisation d'un « peut-être » ; affinité insatisfaite ; pauses longues entre deux blocs.
+- **Limite de résolution** : 10 s.
+
+Deux modes :
+
+- `POST /api/events/{id}/generate` — résout et écrit les affectations en base.
+- `POST /api/events/{id}/generate-proposals` puis `POST /api/events/{id}/apply-proposal` — calcule plusieurs variantes **sans rien écrire**, l'utilisateur choisit celle à appliquer.
+
+Les membres exclus (`PUT /api/events/{id}/exclusions`) sont ignorés par le solveur. Après résolution, les **warnings W1–W7** listent les anomalies restantes et sont conservés sur l'événement (`last_warnings`).
+
+| Code | Anomalie |
+|---|---|
+| W1 | Créneau sans respo bar (soirée uniquement) |
+| W2 | Créneau sous-staffé |
+| W3 | Créneau sans membre bureau |
+| W4 | Membre au-delà du quota de base (2 h) |
+| W5 | Membre placé sur un « peut-être » |
+| W6 | Affinité insatisfaite |
+| W7 | Longue pause (≥ 3 h) entre deux blocs d'un même membre |
+
+---
+
+## Saisons (mandats de bureau)
+
+Une **saison** correspond à un mandat de bureau (souvent avril → avril). Elle sert de fenêtre de filtrage pour les statistiques : le filtre de la page Membres, le badge ✦ et les histogrammes se calculent sur la saison sélectionnée. Sans saison sélectionnée, les stats couvrent tout l'historique.
+
+- CRUD réservé au bureau, via la modale « Saisons » de la page Membres (`/api/saisons`).
+- **Saison en cours** : laisser la date de fin **vide** — la saison couvre alors tout événement à partir de sa date de début, sans borne haute. On pourra la clôturer plus tard en lui donnant une date de fin.
+- Par défaut, la page Membres sélectionne la saison contenant la date du jour.
+
+---
+
+## Page Membres
+
+- Tableau de tous les membres avec rôles modifiables (bureau uniquement) et filtre par saison.
+- **Alias** : noms alternatifs par membre, utilisés par le fuzzy matching des imports.
+- **Fusion de doublons** : `POST /api/members/{id}/merge` réattribue dispos, affectations, stats, respos, affinités et alias du doublon vers le membre cible.
+- **Remise à zéro des compteurs** : par membre ou pour tous (bureau).
+- **« Voir stats »** ouvre un panneau par membre :
+  - Heures staffées : total afterworks, total soirées, total cumulé
+  - **Badge « Bien membré·e·s » (✦)** : atteint à **≥ 10 h** cumulées sur les événements publiés, avec barre de progression
+  - Histogrammes de staffing par heure relative (afterwork / soirée)
+  - Histogramme respo bar (membres bureau uniquement)
+  - Timeline chronologique des événements publiés
 
 ---
 
 ## Import de planning historique
 
-Fonctionnalité réservée aux membres **bureau**. Accessible via « Import historique » dans la barre latérale.
+Fonctionnalité réservée aux membres **bureau**, accessible via « Import historique » dans la barre latérale.
 
-Permet de rétroactivement comptabiliser les heures d'anciens plannings qui existent sous forme d'image (capture d'écran d'une grille Excel ou Google Sheets). Ces heures alimentent les statistiques et le badge « Bien membré·e·s » exactement comme un événement créé normalement.
+Permet de comptabiliser rétroactivement les heures d'anciens plannings qui n'existent que sous forme d'image (capture d'écran d'une grille Excel ou Google Sheets). Ces heures alimentent les statistiques et le badge « Bien membré·e·s » exactement comme un événement créé normalement.
 
 ### Format d'image attendu
 
@@ -271,217 +228,88 @@ Permet de rétroactivement comptabiliser les heures d'anciens plannings qui exis
 
 ### Déroulement
 
-**Étape 1 — Métadonnées + image**
+**Étape 1 — Métadonnées + image** : remplir nom, date et type de l'événement, déposer l'image (PNG, JPEG ou WEBP), cliquer sur **Analyser l'image**. Le backend détecte la grille (en-tête bleue, séparateurs), OCR-ise horaires et noms, détecte les couleurs des cellules, et fuzzy-matche les noms contre les membres en base.
 
-Remplir le nom de l'événement, sa date et son type (Soirée / Afterwork), puis déposer l'image (PNG, JPEG ou WEBP). Cliquer sur **Analyser l'image**.
-
-Le backend effectue automatiquement :
-1. Détection de la ligne d'en-tête bleue et des séparateurs (colonnes via densité bleue, lignes via bandes grises)
-2. OCR de chaque cellule d'en-tête pour lire les horaires
-3. OCR de chaque cellule de la colonne Nom
-4. Détection de couleur sur chaque cellule de données (vert → staff, rouge → respo bar)
-5. Fuzzy matching des noms OCR-isés contre les membres en base (seuil ≥ 90 %)
-
-**Étape 2 — Validation de la prévisualisation**
-
-- **Bandeau orange** : noms non reconnus. Pour chacun, choisir un membre existant (suggestions triées par score), créer un nouveau membre, ou ignorer la ligne.
+**Étape 2 — Validation de la prévisualisation** :
+- **Bandeau orange** : noms non reconnus — choisir un membre existant, en créer un, ou ignorer la ligne.
 - **Pills de créneaux** : heures éditables en cas d'erreur OCR.
-- **Grille** : cliquer sur une cellule pour cycler son état (vide → Staff → Respo bar → vide). La croix en fin de ligne supprime un membre.
+- **Grille** : cliquer sur une cellule pour cycler son état (vide → Staff → Respo bar → vide).
 
-**Étape 3 — Import**
-
-Cliquer sur **Importer cet événement**. Le backend crée :
-- L'`Event` en statut publié
-- Les `Slot`s correspondants (`max_personnes = 99`)
-- Les `Assignment`s pour chaque cellule staff / respo bar
-- Incrémente `fois_staffe` dans `StatsMemberHeureRelative` (alimente les graphiques)
-- Incrémente `shifts_respo_bar_cumules` pour les respos bar
-
-On est redirigé vers la page de détail de l'événement créé. Les membres voient leurs heures rétroactives apparaître dans « Voir stats », et le badge **✦ Bien membré·e·s** se déclenche si le cumul dépasse 10 h.
+**Étape 3 — Import** : crée l'`Event` publié, les `Slot`s (`max_personnes = 99`), les `Assignment`s, et incrémente les compteurs de stats.
 
 ### Limites connues
 
-- L'OCR peut mal lire les noms avec des accents ou des tirets. La prévisualisation permet de corriger avant de valider.
-- L'image doit être une capture propre (pas de rotation, pas de flou). Les exports directs depuis Excel/Google Sheets fonctionnent bien.
-- Tesseract doit être installé dans le conteneur backend (inclus dans le `Dockerfile` via `tesseract-ocr tesseract-ocr-fra`).
+- L'OCR peut mal lire les noms avec accents ou tirets — la prévisualisation permet de corriger avant de valider.
+- L'image doit être propre (pas de rotation ni de flou). Les exports directs Excel/Google Sheets fonctionnent bien.
+- Tesseract est inclus dans l'image backend (`tesseract-ocr tesseract-ocr-fra`).
 
 ---
 
-## Page Membres
+## Modèle de données (résumé)
 
-- Tableau de tous les membres avec rôles modifiables (bureau uniquement)
-- **"Voir stats"** ouvre un panneau par membre :
-  - **Heures staffé·e·s** : total afterworks, total soirées, total cumulé
-  - **Badge Bien membré·e·s** (✦) atteint à 10h cumulées
-  - Barre de progression vers le badge si pas encore atteint
-  - Histogrammes de staffing par heure relative (afterwork / soirée)
-  - Histogramme respo bar (membres bureau uniquement)
-  - Historique chronologique des événements publiés
+### Member
 
----
-
-## Structure du projet
-
-```
-backend/
-├── app/
-│   ├── main.py              FastAPI app + CORS
-│   ├── config.py            Paramètres (pydantic-settings)
-│   ├── database.py          SQLAlchemy engine + session
-│   ├── models/models.py     Tous les modèles ORM
-│   ├── schemas/schemas.py   Schémas Pydantic
-│   ├── core/
-│   │   ├── security.py      JWT + bcrypt
-│   │   └── deps.py          Dépendances FastAPI
-│   ├── routers/
-│   │   ├── auth.py               /api/auth/*
-│   │   ├── members.py            /api/members/* (CRUD, stats, timeline)
-│   │   ├── events.py             /api/events/* (CRUD, CSV, schedule)
-│   │   ├── export.py             /api/events/{id}/export-png
-│   │   └── import_historique.py  /api/import-historique/* (preview + commit)
-│   └── services/
-│       ├── csv_import.py         Import Strawpoll + fuzzy matching
-│       ├── scheduler.py          Algorithme de génération (règles R1-R6)
-│       ├── export_img.py         Export PNG Pillow
-│       └── historical_img_import.py  Parsing image + OCR (pytesseract)
-└── alembic/
-    └── versions/
-        ├── 001_initial.py
-        ├── 002_split_hours.py
-        └── 003_stats_heure_relative.py
-
-frontend/
-├── src/
-│   ├── api/                 Clients axios (auth, events, members, historique)
-│   ├── contexts/            AuthContext
-│   ├── pages/               LoginPage, EventsPage, EventDetailPage, MembersPage,
-│   │                        HistoricalImportPage
-│   └── components/
-│       ├── events/          CsvImport, SlotConfig, RespoBarConfig, AffinityConfig
-│       ├── members/         MemberTable, MemberForm, MemberStats
-│       └── planning/        PlanningGrid, WarningsList
-
-k8s/                         Manifests K3s (namespace: salope)
-```
-
----
-
-## Prérequis locaux
-
-- Docker avec `docker-compose` installé
-- kubectl configuré sur votre cluster K3s (pour le déploiement prod uniquement)
-- cert-manager installé dans le cluster (avec un `ClusterIssuer` nommé `letsencrypt-prod`)
-
----
-
-## Développement local avec Docker
-
-Le `docker-compose.yml` fournit un environnement complet avec **hot-reload** sur le backend et le frontend.
-
-### Démarrage
-
-```bash
-# Premier lancement — build les images et applique les migrations
-docker compose up --build
-
-# Lancement suivants (images déjà buildées)
-docker compose up
-```
-
-| Service | URL | Hot-reload |
+| Colonne | Type | Description |
 |---|---|---|
-| Frontend (Vite) | http://localhost:3000 | Oui — tout changement dans `frontend/src/` est reflété instantanément |
-| Backend (uvicorn) | http://localhost:8000 | Oui — tout changement dans `backend/app/` redémarre le serveur |
-| API docs | http://localhost:8000/docs | — |
-| PostgreSQL | localhost:5432 | — |
+| `nom`, `prenom`, `email` | String | Identité |
+| `roles` | String[] | `staff` et/ou `bureau` |
+| `shifts_respo_bar_cumules` | Integer | Nombre de fois respo bar sur événements publiés |
 
-> Les migrations Alembic sont appliquées automatiquement au démarrage via le service `migrations`.
+### Event → Slot → Availability / Assignment
 
-### Commandes utiles
+- `Event` : nom, date, type, statut (`brouillon` / `publie`), membres exclus, derniers warnings.
+- `Slot` (créneau) : bornes horaires, `heure_relative` (index 0, 1, 2…), `max_personnes`.
+- `Availability` : disponibilité d'un membre sur un créneau (`yes` / `no` / `maybe`), unique par (événement, membre, créneau).
+- `Assignment` : affectation `staff` ou `respo_bar`, de source `auto` (solveur) ou `manuel`.
 
-```bash
-# Voir les logs d'un service
-docker compose logs -f backend
-docker compose logs -f frontend
+### Saison
 
-# Relancer les migrations manuellement (ex. après une nouvelle migration)
-docker compose run --rm migrations
+| Colonne | Type | Description |
+|---|---|---|
+| `nom` | String | ex. « Mandat 2026-2027 » |
+| `date_debut` | Date | Début du mandat |
+| `date_fin` | Date, nullable | Fin du mandat — **NULL = saison en cours** (pas de borne haute) |
 
-# Accéder au shell d'un conteneur
-docker compose exec backend bash
-docker compose exec postgres psql -U baruser -d salope
+### StatsMemberHeureRelative
 
-# Arrêter et supprimer les conteneurs (les données postgres sont conservées)
-docker compose down
+Statistiques par membre × type d'événement × heure relative (index du créneau) : `fois_disponible`, `fois_staffe`.
 
-# Tout supprimer y compris le volume postgres
-docker compose down -v
-```
+### Badge « Bien membré·e·s »
 
-### Premier utilisateur bureau
-
-Après le premier `docker compose up`, créer le compte admin :
-
-```bash
-docker compose exec backend python -c "
-from app.database import SessionLocal
-from app.models.models import Member
-from app.core.security import hash_password
-db = SessionLocal()
-m = Member(
-    nom='Nom',
-    prenom='Prénom',
-    email='admin@lateb.eu',
-    roles=['staff', 'bureau'],
-    hashed_password=hash_password('motdepasse')
-)
-db.add(m)
-db.commit()
-print('Membre créé, id =', m.id)
-"
-```
+Un membre atteint le statut **Bien membré·e·s** dès qu'il cumule **≥ 10 heures** de staff sur l'ensemble des événements publiés (afterworks + soirées confondus). Le total est calculé à la volée à partir des assignments publiés.
 
 ---
 
-## Build des images Docker (production)
+## Déploiement en production (K3s)
 
-Remplacez `your-registry` par votre registry Docker Hub / GitHub Container Registry / etc.
+Prérequis : kubectl configuré sur le cluster, cert-manager installé (avec un `ClusterIssuer` nommé `letsencrypt-prod`).
+
+### 1. Build & push des images
+
+Remplacez `your-registry` par votre registry (Docker Hub, GHCR…) :
 
 ```bash
-# Backend
 docker build -t your-registry/salope-backend:latest ./backend
-
-# Frontend
 docker build -t your-registry/salope-frontend:latest ./frontend
-
-# Push
 docker push your-registry/salope-backend:latest
 docker push your-registry/salope-frontend:latest
 ```
 
----
+### 2. Préparer les secrets
 
-## Déploiement sur K3s (OVH VPS)
-
-### 1. Préparer les secrets
-
-Éditez `k8s/secret.yaml` pour remplacer les valeurs base64 par les vôtres :
+Éditez `k8s/secret.yaml` pour remplacer les valeurs base64 :
 
 ```bash
-# Exemple de génération
 echo -n 'votre-mot-de-passe-postgres' | base64
 openssl rand -base64 32 | tr -d '\n' | base64   # pour SECRET_KEY
 ```
 
-### 2. Adapter la configuration
+### 3. Adapter la configuration
 
-Dans `k8s/configmap.yaml` et `k8s/ingress.yaml`, remplacez :
-- Domaine configuré : `lateb.eu` (frontend sur `planning.lateb.eu`)
+- `k8s/configmap.yaml` et `k8s/ingress.yaml` : domaine (`lateb.eu`, frontend sur `planning.lateb.eu`).
+- `k8s/backend-deployment.yaml` et `k8s/frontend-deployment.yaml` : `your-registry/salope-*:latest` → vos images.
 
-Dans `k8s/backend-deployment.yaml` et `k8s/frontend-deployment.yaml`, remplacez :
-- `your-registry/salope-backend:latest` → votre image
-
-### 3. Appliquer les manifests
+### 4. Appliquer les manifests
 
 ```bash
 # Namespace + secrets + config (dans cet ordre)
@@ -498,11 +326,9 @@ kubectl apply -f k8s/postgres-service.yaml
 kubectl apply -f k8s/migrations-job.yaml
 kubectl wait --for=condition=complete job/salope-migrations -n salope --timeout=120s
 
-# Backend
+# Backend + frontend
 kubectl apply -f k8s/backend-deployment.yaml
 kubectl apply -f k8s/backend-service.yaml
-
-# Frontend
 kubectl apply -f k8s/frontend-deployment.yaml
 kubectl apply -f k8s/frontend-service.yaml
 
@@ -510,7 +336,7 @@ kubectl apply -f k8s/frontend-service.yaml
 kubectl apply -f k8s/ingress.yaml
 ```
 
-### 4. Vérification
+### 5. Vérification
 
 ```bash
 kubectl get pods -n salope
@@ -518,9 +344,7 @@ kubectl get ingress -n salope
 kubectl describe certificate salope-tls -n salope
 ```
 
-### 5. Créer le premier utilisateur bureau
-
-Depuis un pod backend :
+### 6. Premier utilisateur bureau
 
 ```bash
 kubectl exec -it deploy/salope-backend -n salope -- python -c "
@@ -557,21 +381,6 @@ print('Membre créé, id =', m.id)
 
 ---
 
-## Workflow utilisateur
-
-1. **Login** — email + mot de passe (domaine restreint)
-2. **Créer un événement** — nom, date, type (Soirée / Afterwork)
-3. **Importer le CSV Strawpoll** — résolution automatique des noms via alias + fuzzy matching ; validation manuelle des cas ambigus
-4. **Configurer les créneaux** — définir le `max_personnes` par créneau
-5. _(Soirée)_ **Désigner les respos bar** — optionnel, dans l'ordre souhaité
-6. **Saisir les affinités** — paires de membres qui souhaitent se retrouver ensemble
-7. **Générer le planning** — algorithme à escalade automatique
-8. **Ajustements manuels** — cliquer sur une cellule pour modifier une affectation
-9. **Valider & publier** — incrémente les compteurs `heures_cumulees` et `shifts_respo_bar_cumules`
-10. **Exporter en PNG** — image prête à partager
-
----
-
 ## Structure du projet
 
 ```
@@ -584,27 +393,34 @@ backend/
 │   ├── schemas/schemas.py   Schémas Pydantic
 │   ├── core/
 │   │   ├── security.py      JWT + bcrypt
-│   │   └── deps.py          Dépendances FastAPI
+│   │   └── deps.py          Dépendances FastAPI (auth, rôle bureau)
 │   ├── routers/
-│   │   ├── auth.py          /api/auth/*
-│   │   ├── members.py       /api/members/*
-│   │   ├── events.py        /api/events/* (CRUD, CSV, schedule)
-│   │   └── export.py        /api/events/{id}/export-png
+│   │   ├── auth.py               /api/auth/*
+│   │   ├── members.py            /api/members/*  (CRUD, alias, merge, stats, timeline)
+│   │   ├── events.py             /api/events/*   (CRUD, CSV, generate, proposals, publish)
+│   │   ├── saisons.py            /api/saisons/*  (mandats de bureau)
+│   │   ├── export.py             /api/events/{id}/export-png
+│   │   └── import_historique.py  /api/import-historique/* (preview + commit)
 │   └── services/
-│       ├── csv_import.py    Import Strawpoll + fuzzy matching
-│       ├── scheduler.py     Algorithme de génération
-│       └── export_img.py    Export PNG Pillow
-└── alembic/                 Migrations DB
+│       ├── csv_import.py         Import Strawpoll + fuzzy matching
+│       ├── scheduler.py          Génération de planning (solveur CP-SAT OR-Tools)
+│       ├── export_img.py         Export PNG (Pillow)
+│       └── historical_img_import.py  Parsing image + OCR (pytesseract)
+├── tests/                   Suite pytest (CRUD, scheduler, publication, saisons…)
+└── alembic/versions/        Migrations 001 → 007
 
 frontend/
 ├── src/
-│   ├── api/                 Clients axios
+│   ├── api/                 Clients axios (auth, events, members, saisons, historique)
 │   ├── contexts/            AuthContext
-│   ├── pages/               LoginPage, EventsPage, EventDetailPage, MembersPage
+│   ├── pages/               LoginPage, EventsPage, EventDetailPage, MembersPage,
+│   │                        HistoricalImportPage
 │   └── components/
 │       ├── events/          CsvImport, SlotConfig, RespoBarConfig, AffinityConfig
-│       ├── members/         MemberTable, MemberForm
-│       └── planning/        PlanningGrid, WarningsList
+│       ├── members/         MemberTable, MemberForm, MemberStats, SaisonManager
+│       ├── planning/        PlanningGrid, PlanningLegend, WarningsList
+│       └── layout/          Navbar, Sidebar
 
-k8s/                         Manifests K3s
+k8s/                         Manifests K3s (namespace: salope)
+.github/workflows/ci.yml     CI — build frontend + pytest backend
 ```

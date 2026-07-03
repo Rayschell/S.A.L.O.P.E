@@ -23,8 +23,8 @@ export default function StatCard({ label, value, color }) {
       <p
         style={{
           fontSize: 20,
-          fontWeight: 500,
-          letterSpacing: '-0.03em',
+          fontWeight: 600,
+          letterSpacing: '-0.02em',
           color: color || 'var(--text-primary)',
         }}
       >

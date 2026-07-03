@@ -1,15 +1,8 @@
-import { Link, useLocation } from 'react-router-dom'
 import { IconUser, IconMenu2, IconSun, IconMoon } from '@tabler/icons-react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import { useTheme } from '../../contexts/ThemeContext.jsx'
 
-const NAV_LINKS = [
-  { to: '/events', label: 'Événements' },
-  { to: '/members', label: 'Membres' },
-]
-
 export default function Navbar({ onToggleSidebar }) {
-  const location = useLocation()
   const { user } = useAuth()
   const { theme, toggle: toggleTheme } = useTheme()
 
@@ -53,30 +46,6 @@ export default function Navbar({ onToggleSidebar }) {
             S.A.L.O.P.E
           </span>
         </div>
-      </div>
-
-      {/* Navigation */}
-      <div style={{ display: 'flex', gap: 4 }}>
-        {NAV_LINKS.map(({ to, label }) => {
-          const active = location.pathname.startsWith(to)
-          return (
-            <Link
-              key={to}
-              to={to}
-              style={{
-                fontSize: 12,
-                padding: '5px 12px',
-                borderRadius: 6,
-                textDecoration: 'none',
-                color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: active ? 'var(--bg-high)' : 'transparent',
-                transition: 'background 120ms ease, color 120ms ease',
-              }}
-            >
-              {label}
-            </Link>
-          )
-        })}
       </div>
 
       {/* Avatar + theme toggle */}

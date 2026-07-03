@@ -16,7 +16,7 @@ export default function Button({ variant = 'primary', icon: Icon, children, ...p
   const variants = {
     primary: {
       ...base,
-      background: 'var(--violet)',
+      background: 'var(--accent)',
       color: '#fff',
       border: 'none',
     },

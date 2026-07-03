@@ -8,6 +8,9 @@ export const eventsApi = {
   update: (id, payload) => client.put(`/events/${id}`, payload).then((r) => r.data),
   delete: (id) => client.delete(`/events/${id}`),
   publish: (id) => client.post(`/events/${id}/publish`).then((r) => r.data),
+  unpublish: (id) => client.post(`/events/${id}/unpublish`).then((r) => r.data),
+  setExclusions: (id, memberIds) =>
+    client.put(`/events/${id}/exclusions`, { member_ids: memberIds }).then((r) => r.data),
 
   // CSV
   importCsv: (id, file) => {
@@ -49,9 +52,17 @@ export const eventsApi = {
   // Availabilities
   listAvailabilities: (id) => client.get(`/events/${id}/availabilities`).then((r) => r.data),
 
+  // Duplicate
+  duplicate: (id, payload) =>
+    client.post(`/events/${id}/duplicate`, payload).then((r) => r.data),
+
   // Generate
   generate: (id, excludedMemberIds = []) =>
     client.post(`/events/${id}/generate`, { excluded_member_ids: excludedMemberIds }).then((r) => r.data),
+  generateProposals: (id, excludedMemberIds = [], count = 3) =>
+    client.post(`/events/${id}/generate-proposals`, { excluded_member_ids: excludedMemberIds, count }).then((r) => r.data),
+  applyProposal: (id, payload) =>
+    client.post(`/events/${id}/apply-proposal`, payload).then((r) => r.data),
 
   // Export
   exportPngUrl: (id) => `/api/events/${id}/export-png`,

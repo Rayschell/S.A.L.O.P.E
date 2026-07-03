@@ -5,7 +5,9 @@ import enum
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -13,7 +15,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -102,6 +104,10 @@ class Event(Base):
     statut = Column(
         Enum(EventStatutEnum), nullable=False, default=EventStatutEnum.brouillon
     )
+    excluded_member_ids = Column(
+        ARRAY(Integer), nullable=False, default=list, server_default="{}"
+    )
+    last_warnings = Column(JSONB, nullable=True)
 
     slots = relationship(
         "Slot", back_populates="event", cascade="all, delete-orphan"
@@ -238,6 +244,23 @@ class AffinityConstraint(Base):
     __table_args__ = (
         UniqueConstraint(
             "evenement_id", "membre_a_id", "membre_b_id", name="uq_affinity"
+        ),
+    )
+
+
+class Saison(Base):
+    """Mandat de bureau (~avril → avril) servant de fenêtre de filtrage des stats."""
+
+    __tablename__ = "saisons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String, nullable=False)
+    date_debut = Column(Date, nullable=False)
+    date_fin = Column(Date, nullable=True)  # NULL = saison en cours
+
+    __table_args__ = (
+        CheckConstraint(
+            "date_fin IS NULL OR date_fin > date_debut", name="ck_saison_dates"
         ),
     )
 

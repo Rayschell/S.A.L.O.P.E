@@ -8,6 +8,13 @@ export const membersApi = {
   delete: (id) => client.delete(`/members/${id}`),
   resetCounters: (id) => client.post(`/members/${id}/reset-counters`).then((r) => r.data),
   resetAllCounters: () => client.post('/members/reset-all-counters'),
-  getStats: (id) => client.get(`/members/${id}/stats`).then((r) => r.data),
-  getTimeline: (id) => client.get(`/members/${id}/timeline`).then((r) => r.data),
+  getStats: (id, saisonId = null) =>
+    client.get(`/members/${id}/stats`, { params: saisonId ? { saison_id: saisonId } : {} }).then((r) => r.data),
+  getTimeline: (id, saisonId = null) =>
+    client.get(`/members/${id}/timeline`, { params: saisonId ? { saison_id: saisonId } : {} }).then((r) => r.data),
+  statsOverview: (saisonId = null) =>
+    client.get('/members/stats-overview', { params: saisonId ? { saison_id: saisonId } : {} }).then((r) => r.data),
+  addAlias: (id, valeur) => client.post(`/members/${id}/aliases`, { valeur }).then((r) => r.data),
+  deleteAlias: (id, aliasId) => client.delete(`/members/${id}/aliases/${aliasId}`),
+  merge: (id, sourceMemberId) => client.post(`/members/${id}/merge`, { source_member_id: sourceMemberId }).then((r) => r.data),
 }
