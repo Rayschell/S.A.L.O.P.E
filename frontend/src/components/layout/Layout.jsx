@@ -10,8 +10,8 @@ export default function Layout() {
     <div
       style={{
         display: 'grid',
-        gridTemplateRows: '48px 1fr',
-        gridTemplateColumns: sidebarOpen ? '200px 1fr' : '1fr',
+        gridTemplateRows: '56px 1fr',
+        gridTemplateColumns: sidebarOpen ? '220px 1fr' : '1fr',
         height: '100vh',
         overflow: 'hidden',
       }}
@@ -23,7 +23,7 @@ export default function Layout() {
           gridRow: 2,
           gridColumn: sidebarOpen ? 2 : 1,
           overflowY: 'auto',
-          padding: 20,
+          padding: 28,
           background: 'var(--bg-base)',
           minWidth: 0,
         }}

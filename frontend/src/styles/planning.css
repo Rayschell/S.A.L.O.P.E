@@ -187,25 +187,25 @@
 /* la grille de planning, sélection de ligne visible.                 */
 /* ------------------------------------------------------------------ */
 .planning-table.member-table {
-  font-size: 14px;
+  font-size: 15px;
 }
 .planning-table.member-table thead th {
-  padding: 12px 14px;
-  font-size: 12px;
+  padding: 14px 16px;
+  font-size: 11px;
   font-family: 'DM Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.09em;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-mid);
   border-right: none;
 }
 .planning-table.member-table tbody td {
-  padding: 11px 14px;
+  padding: 14px 16px;
   border-right: none;
-  font-size: 14px;
+  font-size: 15px;
 }
 .planning-table.member-table tbody td:first-child {
-  font-size: 14px;
+  font-size: 15px;
   border-right: none;
 }
 .planning-table.member-table tbody tr.row-selected td {

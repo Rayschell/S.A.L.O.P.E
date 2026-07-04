@@ -170,7 +170,7 @@ export default function MembersPage() {
     <div>
       <div data-keep-selection style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <IconUsers size={16} stroke={1.5} color="var(--text-muted)" />
-        <h1 style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Membres</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>Membres</h1>
         {!loading && (
           <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)' }}>
             {members.length}
@@ -183,7 +183,7 @@ export default function MembersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un membre…"
-            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '6px 10px 6px 30px', fontSize: 13, color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", outline: 'none', width: 220 }}
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 12px 8px 34px', fontSize: 14, color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif", outline: 'none', width: 240 }}
           />
         </div>
         {isBureau && (
@@ -193,7 +193,7 @@ export default function MembersPage() {
             title="Filtrer les stats par saison (mandat de bureau)"
             style={{
               background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)', padding: '6px 10px', fontSize: 13,
+              borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: 14,
               color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif",
               outline: 'none', cursor: 'pointer',
             }}
@@ -362,17 +362,17 @@ export default function MembersPage() {
 }
 
 const btnPrimaryStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
+  display: 'inline-flex', alignItems: 'center', gap: 7,
   background: 'var(--accent)', color: '#fff', border: 'none',
-  borderRadius: 'var(--radius-sm)', padding: '7px 14px',
-  fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+  borderRadius: 'var(--radius-sm)', padding: '9px 18px',
+  fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
 }
 
 const btnGhostStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
+  display: 'inline-flex', alignItems: 'center', gap: 7,
   background: 'var(--bg-high)', color: 'var(--text-secondary)',
   border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-  padding: '7px 14px', fontSize: 12, fontWeight: 500,
+  padding: '9px 18px', fontSize: 14, fontWeight: 500,
   cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
 }
 

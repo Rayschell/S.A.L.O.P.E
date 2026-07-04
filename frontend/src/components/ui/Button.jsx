@@ -12,14 +12,14 @@ export default function Button({
 
   const base = {
     borderRadius: 'var(--radius-sm)',
-    padding: '7px 14px',
-    fontSize: 12,
+    padding: '9px 18px',
+    fontSize: 14,
     fontWeight: 500,
     fontFamily: "'DM Sans', sans-serif",
     cursor: isDisabled ? 'not-allowed' : 'pointer',
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     transition: 'background 120ms ease, opacity 120ms ease',
     lineHeight: 1,
     opacity: isDisabled ? 0.5 : 1,
@@ -49,8 +49,8 @@ export default function Button({
   return (
     <button style={variants[variant] || variants.primary} disabled={isDisabled} {...props}>
       {loading
-        ? <IconLoader2 size={12} stroke={1.5} style={{ animation: 'spin 600ms linear infinite' }} />
-        : Icon && <Icon size={12} stroke={1.5} />}
+        ? <IconLoader2 size={14} stroke={1.5} style={{ animation: 'spin 600ms linear infinite' }} />
+        : Icon && <Icon size={14} stroke={1.5} />}
       {children}
     </button>
   )

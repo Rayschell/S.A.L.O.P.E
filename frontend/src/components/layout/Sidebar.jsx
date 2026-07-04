@@ -36,13 +36,13 @@ export default function Sidebar() {
         <div key={section.label}>
           <p
             style={{
-              fontSize: 14,
+              fontSize: 11,
               fontFamily: 'DM Mono, monospace',
               color: 'var(--text-muted)',
               textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              padding: '4px 8px 4px',
-              marginTop: 2,
+              letterSpacing: '0.12em',
+              padding: '6px 10px 4px',
+              marginTop: 4,
             }}
           >
             {section.label}
@@ -57,7 +57,7 @@ export default function Sidebar() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '8px 10px',
+                  padding: '10px 12px',
                   borderRadius: 6,
                   fontSize: 15,
                   textDecoration: 'none',

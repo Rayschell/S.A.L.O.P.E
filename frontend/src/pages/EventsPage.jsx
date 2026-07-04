@@ -131,7 +131,7 @@ export default function EventsPage() {
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 3 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
             {ev.nom}
           </h2>
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
@@ -200,7 +200,7 @@ export default function EventsPage() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
         <IconCalendarEvent size={16} stroke={1.5} color="var(--text-muted)" />
-        <h1 style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Événements</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>Événements</h1>
         {isBureau && (
           <button onClick={() => setShowForm(true)} style={btnPrimaryStyle}>
             <IconPlus size={12} stroke={1.5} />
@@ -361,10 +361,10 @@ const dupInputStyle = {
 }
 
 const btnPrimaryStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
+  display: 'inline-flex', alignItems: 'center', gap: 7,
   background: 'var(--accent)', color: '#fff', border: 'none',
-  borderRadius: 'var(--radius-sm)', padding: '7px 14px',
-  fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+  borderRadius: 'var(--radius-sm)', padding: '9px 18px',
+  fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
 }
 
 const overlayStyle = {

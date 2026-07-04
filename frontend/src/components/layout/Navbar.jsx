@@ -26,7 +26,7 @@ export default function Navbar({ onToggleSidebar }) {
   return (
     <nav
       style={{
-        height: 48,
+        height: 56,
         background: 'var(--bg-surface)',
         borderBottom: '1px solid var(--border)',
         padding: '0 16px 0 12px',

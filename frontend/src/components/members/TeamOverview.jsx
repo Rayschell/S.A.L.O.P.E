@@ -113,7 +113,7 @@ export default function TeamOverview({ members, onSelect }) {
 }
 
 const sectionLabelStyle = {
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 500,
   color: 'var(--text-secondary)',
 }
@@ -121,10 +121,10 @@ const sectionLabelStyle = {
 function TotalPill({ label, value, color, bold }) {
   return (
     <div style={{ flex: 1, background: 'var(--bg-elevated)', borderRadius: 6, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </span>
-      <span style={{ fontSize: 16, fontWeight: bold ? 700 : 500, color, fontFamily: 'DM Mono, monospace', lineHeight: 1.2 }}>
+      <span style={{ fontSize: 20, fontWeight: bold ? 700 : 500, color, fontFamily: 'DM Mono, monospace', lineHeight: 1.2 }}>
         {value.toFixed(value % 1 === 0 ? 0 : 1)}h
       </span>
     </div>
@@ -133,7 +133,7 @@ function TotalPill({ label, value, color, bold }) {
 
 function LegendDot({ color, label }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)' }}>
       <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: color, opacity: 0.85 }} />
       {label}
     </div>
