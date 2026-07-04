@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth, events, export, import_historique, members, saisons
+from .routers import auth, events, export, import_historique, members, public, saisons
 
 app = FastAPI(title="S.A.L.O.P.E API", version="1.0.0", redirect_slashes=False)
 
@@ -25,6 +25,7 @@ app.include_router(events.router)
 app.include_router(saisons.router)
 app.include_router(export.router)
 app.include_router(import_historique.router)
+app.include_router(public.router)
 
 
 @app.get("/healthz")

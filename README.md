@@ -13,6 +13,7 @@ Elle couvre le cycle complet d'un événement : import des disponibilités depui
 - [Développement local](#développement-local)
 - [Tests & CI](#tests--ci)
 - [Workflow utilisateur](#workflow-utilisateur)
+- [Formulaire public de disponibilités](#formulaire-public-de-disponibilités)
 - [Génération de planning](#génération-de-planning)
 - [Saisons (mandats de bureau)](#saisons-mandats-de-bureau)
 - [Page Membres](#page-membres)
@@ -28,6 +29,8 @@ Elle couvre le cycle complet d'un événement : import des disponibilités depui
 
 - **Événements** : création, édition, duplication (créneaux + exclusions copiés), suppression. Deux types : `afterwork` et `soiree`.
 - **Import CSV Strawpoll** : parsing de l'export, résolution des noms par alias + fuzzy matching, validation manuelle des cas ambigus.
+- **Formulaire public de disponibilités** : lien `/dispo/{token}` partageable, sans compte — chaque membre saisit son nom et coche dispo / peut-être / pas dispo par créneau ; toggle d'ouverture + date limite optionnelle ; noms non reconnus mis en attente de validation bureau.
+- **Créneaux manuels** : générateur façon Strawpoll intégré à la création d'événement (plage horaire découpée en pas fixes, passage minuit géré, prévisualisation du nombre de créneaux) + suppression par créneau — plus besoin de CSV pour lancer un événement.
 - **Génération de planning** : solveur CP-SAT (OR-Tools) avec contraintes dures et pénalités pondérées ; mode « propositions » pour comparer plusieurs variantes avant d'appliquer ; exclusion de membres de la génération.
 - **Ajustements manuels** : modification/suppression d'affectations cellule par cellule dans la grille.
 - **Publication / dépublication** : la publication incrémente les compteurs de stats (`fois_staffe`, respo bar) ; la dépublication les décrémente proprement.
@@ -146,15 +149,26 @@ La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque push/PR :
 ## Workflow utilisateur
 
 1. **Login** — email + mot de passe (domaine restreint, `lateb.eu` par défaut)
-2. **Créer un événement** — nom, date, type (Soirée / Afterwork) — ou **dupliquer** un événement existant
-3. **Importer le CSV Strawpoll** — résolution automatique des noms via alias + fuzzy matching ; validation manuelle des cas ambigus
-4. **Configurer les créneaux** — définir le `max_personnes` par créneau
+2. **Créer un événement** — nom, date, type (Soirée / Afterwork) **et ses créneaux** (générateur façon Strawpoll : plage horaire + pas + max personnes) — ou **dupliquer** un événement existant
+3. **Ajuster les créneaux** — onglet Créneaux : `max_personnes` par créneau, suppression d'un créneau
+4. **Collecter les disponibilités** — en partageant le **lien d'inscription public**, ou en important le CSV Strawpoll (les deux passent par la même résolution de noms alias + fuzzy matching ; le CSV crée les créneaux manquants)
 5. _(Soirée)_ **Désigner les respos bar** — optionnel, dans l'ordre souhaité
 6. **Saisir les affinités** — paires de membres qui souhaitent être ensemble
 7. **Générer le planning** — génération directe, ou plusieurs **propositions** comparées côte à côte avant d'en appliquer une ; possibilité d'**exclure des membres** de la génération
 8. **Ajustements manuels** — cliquer sur une cellule pour modifier ou retirer une affectation
 9. **Publier** — incrémente `fois_staffe` par créneau et `shifts_respo_bar_cumules` (la **dépublication** annule ces compteurs)
 10. **Exporter en PNG** — image prête à partager
+
+---
+
+## Formulaire public de disponibilités
+
+Alternative à l'import CSV : un lien `https://…/dispo/{token}` partageable aux membres (Discord, WhatsApp…), **sans compte ni connexion** — l'équivalent interne d'un Strawpoll.
+
+- **Côté membre** : saisir prénom + nom, cocher dispo ✅ / peut-être 🤷 / pas dispo ❌ pour chaque créneau, envoyer. Re-soumettre avec le même nom **écrase** les réponses précédentes.
+- **Côté bureau** (onglet Disponibilités de l'événement) : le lien est **permanent** (token généré à la création de l'événement) ; le toggle « inscriptions ouvertes » contrôle uniquement si le formulaire peut être rempli, avec date limite optionnelle. Les créneaux se définissent **dès la création de l'événement** (générateur façon Strawpoll : plage horaire découpée en pas de 30 min à 2 h) — le CSV n'est plus un prérequis.
+- **Résolution des noms** : un nom reconnu (alias ou fuzzy ≥ seuil) alimente directement les `availabilities` ; un nom inconnu est mis **en attente** et le bureau le résout depuis le même onglet (membre existant / créer / ignorer), via la même modale que l'import CSV.
+- Endpoints publics sous `/api/public/polls/{token}` (GET infos + POST soumission), sans authentification ; le token non devinable fait office d'accès, comme un lien Strawpoll.
 
 ---
 
@@ -399,24 +413,26 @@ backend/
 │   │   ├── members.py            /api/members/*  (CRUD, alias, merge, stats, timeline)
 │   │   ├── events.py             /api/events/*   (CRUD, CSV, generate, proposals, publish)
 │   │   ├── saisons.py            /api/saisons/*  (mandats de bureau)
+│   │   ├── public.py             /api/public/polls/* (formulaire public, sans auth)
 │   │   ├── export.py             /api/events/{id}/export-png
 │   │   └── import_historique.py  /api/import-historique/* (preview + commit)
 │   └── services/
 │       ├── csv_import.py         Import Strawpoll + fuzzy matching
+│       ├── public_poll.py        Formulaire public (soumission, pending, résolution)
 │       ├── scheduler.py          Génération de planning (solveur CP-SAT OR-Tools)
 │       ├── export_img.py         Export PNG (Pillow)
 │       └── historical_img_import.py  Parsing image + OCR (pytesseract)
-├── tests/                   Suite pytest (CRUD, scheduler, publication, saisons…)
-└── alembic/versions/        Migrations 001 → 007
+├── tests/                   Suite pytest (CRUD, scheduler, publication, saisons, poll public…)
+└── alembic/versions/        Migrations 001 → 008
 
 frontend/
 ├── src/
 │   ├── api/                 Clients axios (auth, events, members, saisons, historique)
 │   ├── contexts/            AuthContext
 │   ├── pages/               LoginPage, EventsPage, EventDetailPage, MembersPage,
-│   │                        HistoricalImportPage
+│   │                        HistoricalImportPage, PublicPollPage (/dispo/:token)
 │   └── components/
-│       ├── events/          CsvImport, SlotConfig, RespoBarConfig, AffinityConfig
+│       ├── events/          CsvImport, PublicPollAdmin, SlotConfig, RespoBarConfig, AffinityConfig
 │       ├── members/         MemberTable, MemberForm, MemberStats, SaisonManager
 │       ├── planning/        PlanningGrid, PlanningLegend, WarningsList
 │       └── layout/          Navbar, Sidebar

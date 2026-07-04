@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from ..models.models import (
     AssignmentSourceEnum,
@@ -159,6 +159,24 @@ class EventDuplicateRequest(BaseModel):
 
 class SlotUpdate(BaseModel):
     max_personnes: int
+
+
+class SlotCreate(BaseModel):
+    heure_debut: datetime
+    heure_fin: datetime
+
+    @field_validator("heure_fin")
+    @classmethod
+    def validate_fin(cls, v: datetime, info) -> datetime:
+        debut = info.data.get("heure_debut")
+        if debut is not None and v <= debut:
+            raise ValueError("heure_fin doit être postérieure à heure_debut")
+        return v
+
+
+class SlotsBulkCreate(BaseModel):
+    slots: List[SlotCreate] = Field(min_length=1, max_length=100)
+    max_personnes: int = Field(default=3, ge=1, le=99)
 
 
 # ---------------------------------------------------------------------------
@@ -376,6 +394,84 @@ class SaisonRead(BaseModel):
     date_fin: Optional[date] = None
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Formulaire public de disponibilités
+# ---------------------------------------------------------------------------
+
+
+class PublicSlotOut(BaseModel):
+    id: int
+    heure_debut: datetime
+    heure_fin: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PublicPollInfo(BaseModel):
+    event_nom: str
+    event_date: datetime
+    event_type: EventTypeEnum
+    ouvert: bool
+    raison_fermeture: Optional[str] = None  # "closed" | "deadline"
+    slots: List[PublicSlotOut]
+
+
+class PublicReponse(BaseModel):
+    creneau_id: int
+    statut: AvailabilityStatusEnum
+
+
+class PublicSubmissionIn(BaseModel):
+    nom: str = Field(min_length=1, max_length=100)
+    reponses: List[PublicReponse] = Field(min_length=1, max_length=100)
+
+    @field_validator("nom")
+    @classmethod
+    def strip_nom(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("nom vide")
+        return v
+
+
+class PublicSubmissionResult(BaseModel):
+    status: str  # "matched" | "pending"
+
+
+class PublicLinkOut(BaseModel):
+    public_token: Optional[str] = None
+    inscriptions_ouvertes: bool
+    inscriptions_deadline: Optional[datetime] = None
+    pending_count: int
+    slots_count: int
+
+
+class PublicLinkUpdate(BaseModel):
+    # État complet à chaque PUT (deadline absente = deadline effacée)
+    inscriptions_ouvertes: bool
+    inscriptions_deadline: Optional[datetime] = None
+
+
+class PendingSubmissionOut(BaseModel):
+    id: int
+    csv_name: str
+    created_at: datetime
+    updated_at: datetime
+    suggestions: List[NameSuggestion]
+    availabilities: List[PublicReponse]
+
+
+class PublicResolveEntry(BaseModel):
+    csv_name: str
+    member_id: Optional[int] = None
+    create_new: bool = False
+    availabilities: List[PublicReponse]
+
+
+class PublicResolveRequest(BaseModel):
+    resolutions: List[PublicResolveEntry]
 
 
 # ---------------------------------------------------------------------------

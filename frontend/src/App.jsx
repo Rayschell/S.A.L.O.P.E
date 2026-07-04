@@ -8,6 +8,7 @@ import MembersPage from './pages/MembersPage.jsx'
 import EventsPage from './pages/EventsPage.jsx'
 import EventDetailPage from './pages/EventDetailPage.jsx'
 import HistoricalImportPage from './pages/HistoricalImportPage.jsx'
+import PublicPollPage from './pages/PublicPollPage.jsx'
 import Toaster from './components/ui/Toaster.jsx'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/dispo/:token" element={<PublicPollPage />} />
             <Route
               path="/"
               element={

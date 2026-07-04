@@ -23,10 +23,25 @@ export const eventsApi = {
   resolvePending: (id, resolutions) =>
     client.post(`/events/${id}/resolve-pending`, { resolutions }).then((r) => r.data),
 
+  // Formulaire public de disponibilités
+  getPublicLink: (id) => client.get(`/events/${id}/public-link`).then((r) => r.data),
+  updatePublicLink: (id, payload) =>
+    client.put(`/events/${id}/public-link`, payload).then((r) => r.data),
+  listPublicSubmissions: (id) =>
+    client.get(`/events/${id}/public-submissions`).then((r) => r.data),
+  resolvePublicSubmissions: (id, resolutions) =>
+    client.post(`/events/${id}/public-submissions/resolve`, { resolutions }).then((r) => r.data),
+  deletePublicSubmission: (eventId, submissionId) =>
+    client.delete(`/events/${eventId}/public-submissions/${submissionId}`),
+
   // Slots
   listSlots: (id) => client.get(`/events/${id}/slots`).then((r) => r.data),
+  createSlots: (id, slots, maxPersonnes = 3) =>
+    client.post(`/events/${id}/slots`, { slots, max_personnes: maxPersonnes }).then((r) => r.data),
   updateSlot: (eventId, slotId, payload) =>
     client.put(`/events/${eventId}/slots/${slotId}`, payload).then((r) => r.data),
+  deleteSlot: (eventId, slotId) =>
+    client.delete(`/events/${eventId}/slots/${slotId}`),
 
   // Respos bar
   listResposBar: (id) => client.get(`/events/${id}/respos-bar`).then((r) => r.data),

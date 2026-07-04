@@ -174,7 +174,7 @@ function Histogram({ title, entries, colorRaw, slotLabels = {} }) {
 }
 
 const fmtTime = (dt) =>
-  new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
 const fmtDate = (dt) =>
   new Date(dt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })

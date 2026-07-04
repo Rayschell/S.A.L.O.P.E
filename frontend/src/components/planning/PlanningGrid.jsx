@@ -70,19 +70,31 @@ export default function PlanningGrid({
     [availabilities]
   )
 
+  // Membres avec au moins un créneau dispo (yes/maybe) — ceux qui n'ont répondu
+  // que « pas dispo » n'apportent rien à la grille
+  const availableIds = useMemo(
+    () =>
+      new Set(
+        availabilities
+          .filter((a) => a.statut === 'yes' || a.statut === 'maybe')
+          .map((a) => a.membre_id)
+      ),
+    [availabilities]
+  )
+
   // Planning vide : sans affectation, pré-remplir les lignes avec les
-  // répondant·e·s non exclus (onglet Participants) pour permettre la
-  // construction manuelle du planning sans passer par la génération
+  // répondant·e·s disponibles non exclus (onglet Participants) pour permettre
+  // la construction manuelle du planning sans passer par la génération
   useEffect(() => {
     if (disabled || assignments.length > 0 || slots.length === 0) return
     setExtraMemberIds((prev) => {
       const next = new Set(prev)
-      for (const id of respondentIds) {
+      for (const id of availableIds) {
         if (!excludedMemberIds.has(id)) next.add(id)
       }
       return next.size === prev.size ? prev : next
     })
-  }, [disabled, assignments.length, slots.length, respondentIds, excludedMemberIds])
+  }, [disabled, assignments.length, slots.length, availableIds, excludedMemberIds])
   const visibleIds = new Set(visibleMembers.map((m) => m.id))
   const addableMembers = members
     .filter((m) => !visibleIds.has(m.id))
@@ -104,7 +116,7 @@ export default function PlanningGrid({
   const fmtHours = (h) => (h ? `${h} h` : '—')
 
   const fmtTime = (dt) =>
-    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
   const getCellClass = (asgn, memberId, slotId) => {
     const classes = []

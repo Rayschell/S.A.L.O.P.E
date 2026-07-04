@@ -1,6 +1,7 @@
 """Events router — CRUD, CSV import, schedule generation, assignments."""
 from __future__ import annotations
 
+import secrets
 from datetime import timedelta
 from typing import List
 
@@ -18,6 +19,7 @@ from ..models.models import (
     EventStatutEnum,
     EventTypeEnum,
     Member,
+    PendingSubmission,
     ResponsableBar,
     Slot,
     StatsMemberHeureRelative,
@@ -39,7 +41,12 @@ from ..schemas.schemas import (
     GenerateProposalsResponse,
     GenerateRequest,
     GenerateResponse,
+    PendingSubmissionOut,
     ProposalItem,
+    SlotsBulkCreate,
+    PublicLinkOut,
+    PublicLinkUpdate,
+    PublicResolveRequest,
     RespoBarList,
     RespoBarRead,
     SlotRead,
@@ -47,6 +54,7 @@ from ..schemas.schemas import (
     WarningItem,
 )
 from ..services import csv_import as csv_svc
+from ..services import public_poll
 from ..services.scheduler import (
     check_manual_assignment,
     generate_proposals,
@@ -75,7 +83,12 @@ def create_event(
     db: Session = Depends(get_db),
     _: Member = Depends(require_bureau),
 ):
-    event = Event(nom=payload.nom, date=payload.date, type=payload.type)
+    event = Event(
+        nom=payload.nom,
+        date=payload.date,
+        type=payload.type,
+        public_token=secrets.token_urlsafe(16),
+    )
     db.add(event)
     db.commit()
     db.refresh(event)
@@ -147,6 +160,7 @@ def duplicate_event(
         date=payload.date,
         type=src.type,
         excluded_member_ids=list(src.excluded_member_ids or []),
+        public_token=secrets.token_urlsafe(16),
     )
     db.add(new_event)
     db.flush()
@@ -213,6 +227,119 @@ def resolve_pending(
 
 
 # ---------------------------------------------------------------------------
+# Formulaire public de disponibilités (lien de partage + soumissions en attente)
+# ---------------------------------------------------------------------------
+
+
+def _public_link_out(db: Session, event: Event) -> PublicLinkOut:
+    pending_count = (
+        db.query(PendingSubmission)
+        .filter(PendingSubmission.evenement_id == event.id)
+        .count()
+    )
+    slots_count = db.query(Slot).filter(Slot.evenement_id == event.id).count()
+    return PublicLinkOut(
+        public_token=event.public_token,
+        inscriptions_ouvertes=event.inscriptions_ouvertes,
+        inscriptions_deadline=event.inscriptions_deadline,
+        pending_count=pending_count,
+        slots_count=slots_count,
+    )
+
+
+@router.get("/{event_id}/public-link", response_model=PublicLinkOut)
+def get_public_link(
+    event_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    event = _get_event_or_404(db, event_id)
+    # Backfill pour les événements antérieurs à la génération du token à la création
+    if event.public_token is None:
+        event.public_token = secrets.token_urlsafe(16)
+        db.commit()
+        db.refresh(event)
+    return _public_link_out(db, event)
+
+
+@router.put("/{event_id}/public-link", response_model=PublicLinkOut)
+def update_public_link(
+    event_id: int,
+    payload: PublicLinkUpdate,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    event = _get_event_or_404(db, event_id)
+    if event.public_token is None:
+        event.public_token = secrets.token_urlsafe(16)
+    if payload.inscriptions_ouvertes:
+        slots_count = db.query(Slot).filter(Slot.evenement_id == event_id).count()
+        if slots_count == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Aucun créneau : définissez-les à la création de l'événement ou importez un CSV avant d'ouvrir les inscriptions",
+            )
+    event.inscriptions_ouvertes = payload.inscriptions_ouvertes
+    event.inscriptions_deadline = payload.inscriptions_deadline
+    db.commit()
+    db.refresh(event)
+    return _public_link_out(db, event)
+
+
+@router.get(
+    "/{event_id}/public-submissions", response_model=List[PendingSubmissionOut]
+)
+def list_public_submissions(
+    event_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    _get_event_or_404(db, event_id)
+    return public_poll.list_pending(db, event_id)
+
+
+@router.post("/{event_id}/public-submissions/resolve")
+def resolve_public_submissions(
+    event_id: int,
+    payload: PublicResolveRequest,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    _get_event_or_404(db, event_id)
+    # mode="json" : statuts en str, comme attendu par le service
+    resolutions = [r.model_dump(mode="json") for r in payload.resolutions]
+    try:
+        count = public_poll.resolve_pending_submissions(db, event_id, resolutions)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"resolved_count": count}
+
+
+@router.delete(
+    "/{event_id}/public-submissions/{submission_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_public_submission(
+    event_id: int,
+    submission_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    row = (
+        db.query(PendingSubmission)
+        .filter(
+            PendingSubmission.id == submission_id,
+            PendingSubmission.evenement_id == event_id,
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Soumission introuvable")
+    db.delete(row)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
 # Slots
 # ---------------------------------------------------------------------------
 
@@ -251,6 +378,112 @@ def update_slot(
     db.commit()
     db.refresh(slot)
     return slot
+
+
+def _recompute_heures_relatives(db: Session, event_id: int) -> None:
+    """heure_relative = index du créneau trié par heure_debut (0, 1, 2…)."""
+    slots = (
+        db.query(Slot)
+        .filter(Slot.evenement_id == event_id)
+        .order_by(Slot.heure_debut)
+        .all()
+    )
+    for idx, slot in enumerate(slots):
+        slot.heure_relative = idx
+
+
+@router.post(
+    "/{event_id}/slots",
+    response_model=List[SlotRead],
+    status_code=status.HTTP_201_CREATED,
+)
+def create_slots(
+    event_id: int,
+    payload: SlotsBulkCreate,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """Création manuelle de créneaux (alternative à l'import CSV, façon Strawpoll).
+
+    Les doublons exacts (même heure_debut/heure_fin) sont ignorés silencieusement,
+    ce qui permet de relancer un générateur sur une plage élargie.
+    """
+    event = _get_event_or_404(db, event_id)
+    if event.statut == EventStatutEnum.publie:
+        raise HTTPException(
+            status_code=400, detail="Événement publié : créneaux verrouillés"
+        )
+    existing = {
+        (s.heure_debut, s.heure_fin)
+        for s in db.query(Slot).filter(Slot.evenement_id == event_id)
+    }
+    for item in payload.slots:
+        key = (item.heure_debut, item.heure_fin)
+        if key in existing:
+            continue
+        existing.add(key)
+        db.add(
+            Slot(
+                evenement_id=event_id,
+                heure_debut=item.heure_debut,
+                heure_fin=item.heure_fin,
+                heure_relative=0,
+                max_personnes=payload.max_personnes,
+            )
+        )
+    db.flush()
+    _recompute_heures_relatives(db, event_id)
+    db.commit()
+    return (
+        db.query(Slot)
+        .filter(Slot.evenement_id == event_id)
+        .order_by(Slot.heure_debut)
+        .all()
+    )
+
+
+@router.delete("/{event_id}/slots/{slot_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_slot(
+    event_id: int,
+    slot_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    event = _get_event_or_404(db, event_id)
+    if event.statut == EventStatutEnum.publie:
+        raise HTTPException(
+            status_code=400, detail="Événement publié : créneaux verrouillés"
+        )
+    slot = (
+        db.query(Slot)
+        .filter(Slot.evenement_id == event_id, Slot.id == slot_id)
+        .first()
+    )
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+
+    # Les availabilities du créneau partent en cascade : décrémenter les stats
+    # fois_disponible qu'elles avaient incrémentées (cohérence avec le delta
+    # de _save_availabilities).
+    avails = db.query(Availability).filter(Availability.creneau_id == slot_id).all()
+    for a in avails:
+        if a.statut.value in ("yes", "maybe"):
+            stat = (
+                db.query(StatsMemberHeureRelative)
+                .filter_by(
+                    membre_id=a.membre_id,
+                    type_evenement=event.type,
+                    heure_relative=slot.heure_relative,
+                )
+                .first()
+            )
+            if stat:
+                stat.fois_disponible = max(0, stat.fois_disponible - 1)
+
+    db.delete(slot)
+    db.flush()
+    _recompute_heures_relatives(db, event_id)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import enum
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
@@ -108,6 +109,12 @@ class Event(Base):
         ARRAY(Integer), nullable=False, default=list, server_default="{}"
     )
     last_warnings = Column(JSONB, nullable=True)
+    # Formulaire public de disponibilités (lien /dispo/{token})
+    public_token = Column(String, unique=True, nullable=True, index=True)
+    inscriptions_ouvertes = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    inscriptions_deadline = Column(DateTime, nullable=True)
 
     slots = relationship(
         "Slot", back_populates="event", cascade="all, delete-orphan"
@@ -120,6 +127,9 @@ class Event(Base):
     )
     affinity_constraints = relationship(
         "AffinityConstraint", back_populates="event", cascade="all, delete-orphan"
+    )
+    pending_submissions = relationship(
+        "PendingSubmission", back_populates="event", cascade="all, delete-orphan"
     )
 
 
@@ -244,6 +254,36 @@ class AffinityConstraint(Base):
     __table_args__ = (
         UniqueConstraint(
             "evenement_id", "membre_a_id", "membre_b_id", name="uq_affinity"
+        ),
+    )
+
+
+class PendingSubmission(Base):
+    """Soumission du formulaire public dont le nom n'a pas matché un membre.
+
+    Conservée avec le nom brut jusqu'à résolution par le bureau (choisir un
+    membre / créer / ignorer). `reponses` = [{"creneau_id": int, "statut": str}].
+    """
+
+    __tablename__ = "pending_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    evenement_id = Column(
+        Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=False
+    )
+    nom_saisi = Column(String, nullable=False)
+    nom_normalise = Column(String, nullable=False)
+    reponses = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
+
+    event = relationship("Event", back_populates="pending_submissions")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "evenement_id", "nom_normalise", name="uq_pending_submission_event_nom"
         ),
     )
 

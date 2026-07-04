@@ -5,6 +5,7 @@ import { computeWarnings } from '../utils/computeWarnings.js'
 import { membersApi } from '../api/members.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import CsvImport from '../components/events/CsvImport.jsx'
+import PublicPollAdmin from '../components/events/PublicPollAdmin.jsx'
 import RespoBarConfig from '../components/events/RespoBarConfig.jsx'
 import AffinityConfig from '../components/events/AffinityConfig.jsx'
 import SlotConfig from '../components/events/SlotConfig.jsx'
@@ -18,7 +19,7 @@ import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload, IconCopy, IconA
 
 const TABS = ['import', 'config', 'respos', 'affinites', 'participants', 'planning']
 const TAB_LABELS = {
-  import: '1. Import CSV',
+  import: '1. Disponibilités',
   config: '2. Créneaux',
   respos: '3. Respos bar',
   affinites: '4. Affinités (opt.)',
@@ -263,7 +264,7 @@ export default function EventDetailPage() {
   const slotCounts = {}
   for (const a of assignments) slotCounts[a.creneau_id] = (slotCounts[a.creneau_id] || 0) + 1
   const understaffedSlots = slots.filter((s) => (slotCounts[s.id] || 0) < s.max_personnes)
-  const fmtTime = (dt) => new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const fmtTime = (dt) => new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
   return (
     <div>
@@ -412,11 +413,18 @@ export default function EventDetailPage() {
 
       {/* Tab content */}
       {tab === 'import' && (
-        <CsvImport
-          eventId={id}
-          onImported={async () => { await reload(); advanceFrom('import') }}
-          disabled={!isBureau || isPublished}
-        />
+        <>
+          <CsvImport
+            eventId={id}
+            onImported={async () => { await reload(); advanceFrom('import') }}
+            disabled={!isBureau || isPublished}
+          />
+          <PublicPollAdmin
+            eventId={id}
+            onImported={async () => { await reload(); advanceFrom('import') }}
+            disabled={!isBureau || isPublished}
+          />
+        </>
       )}
       {tab === 'config' && (
         <SlotConfig

@@ -290,6 +290,7 @@ def _save_availabilities(
         if not slot_id:
             continue
         statut_str = item["statut"]
+        counts_new = statut_str in ("yes", "maybe")
         existing = (
             db.query(Availability)
             .filter(
@@ -300,8 +301,10 @@ def _save_availabilities(
             .first()
         )
         if existing:
+            counts_old = existing.statut.value in ("yes", "maybe")
             existing.statut = AvailabilityStatusEnum(statut_str)
         else:
+            counts_old = False
             db.add(
                 Availability(
                     evenement_id=event_id,
@@ -310,8 +313,10 @@ def _save_availabilities(
                     statut=AvailabilityStatusEnum(statut_str),
                 )
             )
-        # Increment fois_disponible for yes/maybe
-        if statut_str in ("yes", "maybe"):
+        # Ajuste fois_disponible par delta : une ré-écriture (ré-import CSV,
+        # re-soumission publique) ne doit pas re-compter une dispo déjà comptée.
+        delta = int(counts_new) - int(counts_old)
+        if delta != 0:
             hr = slot_id_to_hr.get(slot_id)
             if hr is not None:
                 stat = (
@@ -324,8 +329,8 @@ def _save_availabilities(
                     .first()
                 )
                 if stat:
-                    stat.fois_disponible += 1
-                else:
+                    stat.fois_disponible = max(0, stat.fois_disponible + delta)
+                elif delta > 0:
                     db.add(StatsMemberHeureRelative(
                         membre_id=member_id,
                         type_evenement=event_type,

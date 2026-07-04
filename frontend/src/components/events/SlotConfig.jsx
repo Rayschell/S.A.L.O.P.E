@@ -1,11 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { eventsApi } from '../../api/events.js'
+import { IconTrash } from '@tabler/icons-react'
 import '../../styles/planning.css'
 
 export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
   const [maxPersonnes, setMaxPersonnes] = useState(
     Object.fromEntries(slots.map((s) => [s.id, s.max_personnes]))
   )
+  // Les créneaux peuvent changer pendant que l'onglet est monté (suppression
+  // ci-dessous) : resynchroniser sans perdre les éditions en cours.
+  useEffect(() => {
+    setMaxPersonnes((prev) =>
+      Object.fromEntries(slots.map((s) => [s.id, prev[s.id] ?? s.max_personnes]))
+    )
+  }, [slots])
   const [saving, setSaving] = useState(false)
   const [applyAll, setApplyAll] = useState(3)
 
@@ -23,15 +31,21 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
     }
   }
 
+  const handleDelete = async (slot) => {
+    if (!confirm('Supprimer ce créneau ? Les réponses et affectations associées seront perdues.')) return
+    await eventsApi.deleteSlot(eventId, slot.id)
+    onSaved()
+  }
+
   const fmt = (dt) =>
-    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
   const fmtDate = (dt) =>
     new Date(dt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
   if (slots.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 12 }}>
-        Aucun créneau. Importez d'abord un CSV.
+        Aucun créneau. Ils se définissent à la création de l'événement, ou via un import CSV.
       </div>
     )
   }
@@ -93,6 +107,7 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
             <tr>
               <th>Créneau</th>
               <th style={{ width: 160 }}>Max personnes</th>
+              {!disabled && <th style={{ width: 40 }} />}
             </tr>
           </thead>
           <tbody>
@@ -128,6 +143,17 @@ export default function SlotConfig({ slots, eventId, onSaved, disabled }) {
                     }}
                   />
                 </td>
+                {!disabled && (
+                  <td>
+                    <button
+                      onClick={() => handleDelete(s)}
+                      title="Supprimer ce créneau"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', display: 'flex', alignItems: 'center', padding: 4 }}
+                    >
+                      <IconTrash size={14} stroke={1.5} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

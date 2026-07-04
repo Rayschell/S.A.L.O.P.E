@@ -92,7 +92,7 @@ export default function ProposalCompareModal({ eventId, slots, members, excluded
   }
 
   const fmtTime = (dt) =>
-    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>

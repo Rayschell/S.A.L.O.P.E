@@ -248,8 +248,8 @@ export default function EventsPage() {
       )}
 
       {showForm && (
-        <div style={overlayStyle}>
-          <div style={panelStyle}>
+        <div style={overlayStyle} onClick={() => setShowForm(false)}>
+          <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <EventForm
               onSaved={() => { setShowForm(false); load() }}
               onCancel={() => setShowForm(false)}
@@ -259,8 +259,8 @@ export default function EventsPage() {
       )}
 
       {duplicating && (
-        <div style={overlayStyle}>
-          <div style={panelStyle}>
+        <div style={overlayStyle} onClick={() => setDuplicating(null)}>
+          <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
               Dupliquer « {duplicating.nom} »
             </h2>
