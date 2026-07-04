@@ -8,7 +8,14 @@ import MemberTable from '../components/members/MemberTable.jsx'
 import MemberStats from '../components/members/MemberStats.jsx'
 import TeamOverview from '../components/members/TeamOverview.jsx'
 import SaisonManager from '../components/members/SaisonManager.jsx'
-import { IconPlus, IconRefresh, IconUsers, IconSearch, IconX, IconCalendarCog } from '@tabler/icons-react'
+import { SkeletonRow } from '../components/ui/Skeleton.jsx'
+import Skeleton from '../components/ui/Skeleton.jsx'
+import EmptyState from '../components/ui/EmptyState.jsx'
+import { showConfirm } from '../components/ui/ConfirmModal.jsx'
+import { toast } from '../components/ui/Toaster.jsx'
+import {
+  IconPlus, IconRefresh, IconUsers, IconSearch, IconX, IconCalendarCog,
+} from '@tabler/icons-react'
 
 export default function MembersPage() {
   const { user } = useAuth()
@@ -20,7 +27,7 @@ export default function MembersPage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [detail, setDetail] = useState(null) // { stats, timeline }
+  const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [saisons, setSaisons] = useState([])
   const [saisonsLoaded, setSaisonsLoaded] = useState(false)
@@ -29,12 +36,10 @@ export default function MembersPage() {
   const selectedId = Number(searchParams.get('membre')) || null
   const selectedMember = members.find((m) => m.id === selectedId) || null
 
-  // ?saison= : absent → défaut (saison contenant aujourd'hui), 'all' → tout l'historique
   const saisonParam = searchParams.get('saison')
   const saisonId = saisonParam && saisonParam !== 'all' ? Number(saisonParam) : null
   const selectedSaison = saisons.find((s) => s.id === saisonId) || null
 
-  // Mise à jour de l'URL en préservant les autres paramètres (membre + saison)
   const setParams = (updates, opts) => {
     const next = new URLSearchParams(searchParams)
     for (const [k, v] of Object.entries(updates)) {
@@ -51,7 +56,6 @@ export default function MembersPage() {
 
   useEffect(() => { loadSaisons() }, [])
 
-  // Défaut : saison contenant la date du jour (seulement si l'URL n'impose rien)
   useEffect(() => {
     if (!saisonsLoaded || searchParams.get('saison') !== null) return
     const today = new Date().toISOString().slice(0, 10)
@@ -75,10 +79,7 @@ export default function MembersPage() {
   useEffect(() => { load() }, [saisonId])
 
   useEffect(() => {
-    if (!selectedId || !isBureau) {
-      setDetail(null)
-      return
-    }
+    if (!selectedId || !isBureau) { setDetail(null); return }
     let cancelled = false
     setDetailLoading(true)
     Promise.all([membersApi.getStats(selectedId, saisonId), membersApi.getTimeline(selectedId, saisonId)])
@@ -88,8 +89,6 @@ export default function MembersPage() {
     return () => { cancelled = true }
   }, [selectedId, isBureau, saisonId])
 
-  // Clic « dans le vide » de la zone de contenu (hors header de page, table,
-  // carte détail et modales) → désélectionne le membre et referme la carte stats
   useEffect(() => {
     if (!selectedId || showForm || showSaisons) return
     const onDown = (e) => {
@@ -102,21 +101,46 @@ export default function MembersPage() {
   }, [selectedId, showForm, showSaisons, searchParams])
 
   const handleDelete = async (id) => {
-    if (!confirm('Supprimer ce membre ?')) return
+    const m = members.find((x) => x.id === id)
+    const ok = await showConfirm({
+      title: `Supprimer ${m ? `${m.prenom} ${m.nom}` : 'ce membre'} ?`,
+      message: 'Toutes ses disponibilités, affectations et statistiques seront supprimées.',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      variant: 'danger',
+    })
+    if (!ok) return
     await membersApi.delete(id)
+    toast.success('Membre supprimé.')
     if (id === selectedId) setParams({ membre: null })
     load()
   }
 
   const handleResetCounters = async (id) => {
-    if (!confirm('Réinitialiser les compteurs de ce membre ?')) return
+    const m = members.find((x) => x.id === id)
+    const ok = await showConfirm({
+      title: `Réinitialiser les compteurs de ${m ? `${m.prenom} ${m.nom}` : 'ce membre'} ?`,
+      message: 'Les compteurs heures et respo bar seront remis à zéro.',
+      confirmLabel: 'Réinitialiser',
+      cancelLabel: 'Annuler',
+    })
+    if (!ok) return
     await membersApi.resetCounters(id)
+    toast.success('Compteurs réinitialisés.')
     load()
   }
 
   const handleResetAll = async () => {
-    if (!confirm('Réinitialiser TOUS les compteurs ?')) return
+    const ok = await showConfirm({
+      title: 'Réinitialiser TOUS les compteurs ?',
+      message: 'Les compteurs heures et respo bar de tous les membres seront remis à zéro.',
+      confirmLabel: 'Réinitialiser tout',
+      cancelLabel: 'Annuler',
+      variant: 'danger',
+    })
+    if (!ok) return
     await membersApi.resetAllCounters()
+    toast.success('Tous les compteurs ont été réinitialisés.')
     load()
   }
 
@@ -125,12 +149,7 @@ export default function MembersPage() {
     load()
   }
 
-  const handleSaved = () => {
-    setShowForm(false)
-    setEditing(null)
-    load()
-  }
-
+  const handleSaved = () => { setShowForm(false); setEditing(null); load() }
   const handleSelect = (m) => {
     if (m.id === selectedId) setParams({ membre: null })
     else setParams({ membre: m.id })
@@ -210,7 +229,39 @@ export default function MembersPage() {
       )}
 
       {loading ? (
-        <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 560px', minWidth: 0 }}>
+            {/* En-tête tableau */}
+            <div style={{ display: 'flex', gap: 12, padding: '10px 12px', marginBottom: 2 }}>
+              <Skeleton height={10} width="30%" />
+              <Skeleton height={10} width="20%" />
+              <Skeleton height={10} width="20%" />
+            </div>
+            {[...Array(6)].map((_, i) => (
+              <SkeletonRow key={i} style={{ opacity: 1 - i * 0.1 }} />
+            ))}
+          </div>
+          {isBureau && (
+            <div style={{
+              flex: '0 0 400px', minWidth: 320,
+              background: 'var(--bg-surface)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)', padding: 20,
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}>
+              <Skeleton height={14} width="55%" />
+              <Skeleton height={10} width="40%" />
+              <Skeleton height={80} borderRadius={8} style={{ marginTop: 8 }} />
+              <Skeleton height={80} borderRadius={8} />
+            </div>
+          )}
+        </div>
+      ) : members.length === 0 ? (
+        <EmptyState
+          icon={IconUsers}
+          title="Aucun membre pour l'instant"
+          description={isBureau ? 'Ajoute le premier membre pour commencer à gérer le staff.' : 'Les membres apparaîtront ici.'}
+          action={isBureau ? { label: 'Ajouter un membre', icon: IconPlus, onClick: () => { setEditing(null); setShowForm(true) } } : undefined}
+        />
       ) : (
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div data-keep-selection style={{ flex: '1 1 560px', minWidth: 0 }}>
@@ -231,16 +282,11 @@ export default function MembersPage() {
             <div
               data-keep-selection
               style={{
-                flex: '0 0 400px',
-                minWidth: 320,
-                position: 'sticky',
-                top: 16,
-                maxHeight: 'calc(100vh - 96px)',
-                overflowY: 'auto',
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 20,
+                flex: '0 0 400px', minWidth: 320,
+                position: 'sticky', top: 16,
+                maxHeight: 'calc(100vh - 96px)', overflowY: 'auto',
+                background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)', padding: 20,
               }}
             >
               {selectedMember ? (
@@ -267,7 +313,13 @@ export default function MembersPage() {
                     </button>
                   </div>
                   {detailLoading ? (
-                    <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <Skeleton height={11} width="75%" />
+                      <Skeleton height={11} width="55%" />
+                      <Skeleton height={90} borderRadius={8} style={{ marginTop: 6 }} />
+                      <Skeleton height={90} borderRadius={8} />
+                      <Skeleton height={60} borderRadius={8} />
+                    </div>
                   ) : (
                     <MemberStats
                       stats={detail?.stats}
@@ -310,51 +362,27 @@ export default function MembersPage() {
 }
 
 const btnPrimaryStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  background: 'var(--accent)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 'var(--radius-sm)',
-  padding: '7px 14px',
-  fontSize: 12,
-  fontWeight: 500,
-  cursor: 'pointer',
-  fontFamily: "'DM Sans', sans-serif",
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'var(--accent)', color: '#fff', border: 'none',
+  borderRadius: 'var(--radius-sm)', padding: '7px 14px',
+  fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
 }
 
 const btnGhostStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  background: 'var(--bg-high)',
-  color: 'var(--text-secondary)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-sm)',
-  padding: '7px 14px',
-  fontSize: 12,
-  fontWeight: 500,
-  cursor: 'pointer',
-  fontFamily: "'DM Sans', sans-serif",
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'var(--bg-high)', color: 'var(--text-secondary)',
+  border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+  padding: '7px 14px', fontSize: 12, fontWeight: 500,
+  cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
 }
 
 const overlayStyle = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0, 0, 0, 0.6)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 50,
+  position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.6)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
 }
 
 const panelStyle = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-mid)',
-  borderRadius: 'var(--radius-lg)',
-  padding: 24,
-  width: '100%',
-  maxWidth: 440,
-  margin: '0 16px',
+  background: 'var(--bg-surface)', border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-lg)', padding: 24,
+  width: '100%', maxWidth: 440, margin: '0 16px',
 }

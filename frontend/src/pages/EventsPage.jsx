@@ -4,7 +4,14 @@ import { eventsApi } from '../api/events.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import EventForm from '../components/events/EventForm.jsx'
 import Badge from '../components/ui/Badge.jsx'
-import { IconPlus, IconCalendarEvent, IconTrash, IconCopy } from '@tabler/icons-react'
+import { SkeletonCard } from '../components/ui/Skeleton.jsx'
+import EmptyState from '../components/ui/EmptyState.jsx'
+import { showConfirm } from '../components/ui/ConfirmModal.jsx'
+import { toast } from '../components/ui/Toaster.jsx'
+import {
+  IconPlus, IconCalendarEvent, IconTrash, IconCopy,
+  IconCalendarOff, IconFilterOff,
+} from '@tabler/icons-react'
 
 const sectionLabelStyle = {
   fontSize: 12,
@@ -25,6 +32,7 @@ const pillStyle = (active) => ({
   color: active ? 'var(--text-primary)' : 'var(--text-muted)',
   cursor: 'pointer',
   fontFamily: "'DM Sans', sans-serif",
+  transition: 'background 120ms ease, color 120ms ease',
 })
 
 export default function EventsPage() {
@@ -37,9 +45,10 @@ export default function EventsPage() {
   const [showForm, setShowForm] = useState(false)
   const [filterType, setFilterType] = useState('tous')
   const [filterStatut, setFilterStatut] = useState('tous')
-  const [duplicating, setDuplicating] = useState(null) // événement source
+  const [duplicating, setDuplicating] = useState(null)
   const [dupForm, setDupForm] = useState({ nom: '', date: '' })
   const [dupBusy, setDupBusy] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -48,10 +57,23 @@ export default function EventsPage() {
 
   useEffect(() => { load() }, [])
 
-  const handleDelete = async (id) => {
-    if (!confirm('Supprimer cet événement ?')) return
-    await eventsApi.delete(id)
-    load()
+  const handleDelete = async (ev) => {
+    const ok = await showConfirm({
+      title: `Supprimer « ${ev.nom} » ?`,
+      message: 'Cette action est irréversible. L\'événement et toutes ses données seront supprimés.',
+      confirmLabel: 'Supprimer',
+      cancelLabel: 'Annuler',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setDeletingId(ev.id)
+    try {
+      await eventsApi.delete(ev.id)
+      toast.success('Événement supprimé.')
+      load()
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const openDuplicate = (ev) => {
@@ -102,7 +124,10 @@ export default function EventsPage() {
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        transition: 'border-color 150ms ease',
       }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--border-mid)')}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -124,14 +149,10 @@ export default function EventsPage() {
         <Link
           to={`/events/${ev.id}`}
           style={{
-            flex: 1,
-            textAlign: 'center',
-            padding: '6px 0',
-            fontSize: 12,
-            color: 'var(--accent)',
-            background: 'var(--accent-soft)',
-            borderRadius: 'var(--radius-sm)',
-            textDecoration: 'none',
+            flex: 1, textAlign: 'center', padding: '6px 0', fontSize: 12,
+            color: 'var(--accent)', background: 'var(--accent-soft)',
+            borderRadius: 'var(--radius-sm)', textDecoration: 'none',
+            transition: 'opacity 120ms ease',
           }}
         >
           Ouvrir
@@ -141,16 +162,11 @@ export default function EventsPage() {
             onClick={() => openDuplicate(ev)}
             title="Créer un nouvel événement à partir de celui-ci (créneaux + exclusions)"
             style={{
-              padding: '6px 10px',
-              fontSize: 12,
-              color: 'var(--accent)',
-              background: 'var(--accent-soft)',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
+              padding: '6px 10px', fontSize: 12, color: 'var(--accent)',
+              background: 'var(--accent-soft)', borderRadius: 'var(--radius-sm)',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
+              transition: 'opacity 120ms ease',
             }}
           >
             <IconCopy size={11} stroke={1.5} />
@@ -159,27 +175,26 @@ export default function EventsPage() {
         )}
         {isBureau && ev.statut === 'brouillon' && (
           <button
-            onClick={() => handleDelete(ev.id)}
+            onClick={() => handleDelete(ev)}
+            disabled={deletingId === ev.id}
             style={{
-              padding: '6px 10px',
-              fontSize: 12,
-              color: 'var(--red)',
-              background: 'var(--red-soft)',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
+              padding: '6px 10px', fontSize: 12, color: 'var(--red)',
+              background: 'var(--red-soft)', borderRadius: 'var(--radius-sm)',
+              border: 'none', cursor: deletingId === ev.id ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
+              opacity: deletingId === ev.id ? 0.5 : 1,
+              transition: 'opacity 120ms ease',
             }}
           >
             <IconTrash size={11} stroke={1.5} />
-            Supprimer
+            {deletingId === ev.id ? 'Suppression…' : 'Supprimer'}
           </button>
         )}
       </div>
     </div>
   )
+
+  const hasFilters = filterType !== 'tous' || filterStatut !== 'tous'
 
   return (
     <div>
@@ -221,11 +236,30 @@ export default function EventsPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chargement…</p>
-      ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 12 }}>
-          Aucun événement.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div>
+            <div style={{ height: 12, width: 48, background: 'var(--bg-high)', borderRadius: 4, marginBottom: 10, animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+              {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          </div>
         </div>
+      ) : filtered.length === 0 ? (
+        events.length === 0 ? (
+          <EmptyState
+            icon={IconCalendarEvent}
+            title="Aucun événement pour l'instant"
+            description={isBureau ? 'Crée le premier événement pour commencer à planifier les shifts.' : 'Les événements apparaîtront ici une fois créés.'}
+            action={isBureau ? { label: 'Créer un événement', icon: IconPlus, onClick: () => setShowForm(true) } : undefined}
+          />
+        ) : (
+          <EmptyState
+            icon={IconFilterOff}
+            title="Aucun événement ne correspond"
+            description="Essaie d'élargir les filtres pour voir plus de résultats."
+            action={{ label: 'Réinitialiser les filtres', onClick: () => { setFilterType('tous'); setFilterStatut('tous') } }}
+          />
+        )
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {upcoming.length > 0 && (
@@ -266,8 +300,7 @@ export default function EventsPage() {
             </h2>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
               Copie les créneaux (avec leurs capacités) et les exclusions vers la nouvelle date.
-              Les respos bar, affinités et disponibilités ne sont pas copiés — les dispos viendront
-              du nouvel import CSV.
+              Les respos bar, affinités et disponibilités ne sont pas copiés.
             </p>
             <form onSubmit={handleDuplicate} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <label style={dupLabelStyle}>
@@ -301,7 +334,7 @@ export default function EventsPage() {
                 <button
                   type="submit"
                   disabled={dupBusy || !dupForm.date}
-                  style={{ ...btnPrimaryStyle, opacity: dupBusy || !dupForm.date ? 0.5 : 1 }}
+                  style={{ ...btnPrimaryStyle, opacity: dupBusy || !dupForm.date ? 0.5 : 1, cursor: dupBusy || !dupForm.date ? 'not-allowed' : 'pointer' }}
                 >
                   <IconCopy size={12} stroke={1.5} />
                   {dupBusy ? 'Duplication…' : 'Dupliquer'}
@@ -316,56 +349,31 @@ export default function EventsPage() {
 }
 
 const dupLabelStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 5,
-  fontSize: 12,
-  color: 'var(--text-secondary)',
-  fontFamily: "'DM Sans', sans-serif",
+  display: 'flex', flexDirection: 'column', gap: 5,
+  fontSize: 12, color: 'var(--text-secondary)', fontFamily: "'DM Sans', sans-serif",
 }
 
 const dupInputStyle = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-sm)',
-  padding: '8px 10px',
-  fontSize: 13,
-  color: 'var(--text-primary)',
-  fontFamily: "'DM Sans', sans-serif",
+  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-sm)', padding: '8px 10px',
+  fontSize: 13, color: 'var(--text-primary)', fontFamily: "'DM Sans', sans-serif",
   outline: 'none',
 }
 
 const btnPrimaryStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  background: 'var(--accent)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 'var(--radius-sm)',
-  padding: '7px 14px',
-  fontSize: 12,
-  fontWeight: 500,
-  cursor: 'pointer',
-  fontFamily: "'DM Sans', sans-serif",
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'var(--accent)', color: '#fff', border: 'none',
+  borderRadius: 'var(--radius-sm)', padding: '7px 14px',
+  fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
 }
 
 const overlayStyle = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0, 0, 0, 0.6)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 50,
+  position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.6)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
 }
 
 const panelStyle = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-mid)',
-  borderRadius: 'var(--radius-lg)',
-  padding: 24,
-  width: '100%',
-  maxWidth: 440,
-  margin: '0 16px',
+  background: 'var(--bg-surface)', border: '1px solid var(--border-mid)',
+  borderRadius: 'var(--radius-lg)', padding: 24,
+  width: '100%', maxWidth: 440, margin: '0 16px',
 }
