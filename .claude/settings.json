@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose*)",
+      "Bash(docker compose run*)",
+      "Bash(npm*)",
+      "Bash(rtk*)",
+      "Bash(git*)",
+      "Bash(pytest*)",
+      "Bash(psql*)",
+      "Bash(kubectl*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const i = process.env.CLAUDE_TOOL_INPUT || ''; if (i.includes('alembic/versions')) { console.log('\\n⚠️  Migration créée — pense à lancer : docker compose run --rm migrations'); }\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk git diff --stat HEAD 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
