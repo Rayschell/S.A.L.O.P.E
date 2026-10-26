@@ -84,7 +84,7 @@ La publication est la seule action qui met à jour les compteurs de stats. La d�
 
 ### Auth
 
-JWT en httpOnly cookies (access + refresh). `require_bureau` dans `deps.py` gate les mutations sensibles. Le formulaire public (`/api/public/polls/{token}`) est le seul endpoint sans auth — le token opaque fait office d'accès.
+Login Google OIDC (`/api/auth/google/login` → callback, `services/google_auth.py`) : tout compte `@lateb.eu` est créé en `staff` au premier login, et les emails de `BUREAU_EMAILS` reçoivent `bureau`. Le login email/mot de passe reste dispo. Ensuite JWT en httpOnly cookies (access + refresh). `require_bureau` dans `deps.py` gate les mutations sensibles. Le formulaire public (`/api/public/polls/{token}`) est le seul endpoint sans auth — le token opaque fait office d'accès.
 
 ### Modèle de données — points non-évidents
 
@@ -146,4 +146,6 @@ Minimales pour faire tourner le backend hors docker (copier `.env.example` → `
 | `SECRET_KEY` | n'importe quelle chaîne ≥ 32 chars | Signature JWT |
 | `ALLOWED_EMAIL_DOMAIN` | `lateb.eu` | Domaine email autorisé au login |
 | `CORS_ORIGINS` | `http://localhost:3000` | Origin frontend |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | depuis Google Cloud Console | Client OAuth « Web » ; redirect URI `http://localhost:3000/api/auth/google/callback` |
+| `BUREAU_EMAILS` | `zachee.descamps@lateb.eu` | Emails (virgules) promus `bureau` à la connexion |
 | `COOKIE_SECURE` | `false` | `true` uniquement en prod HTTPS |

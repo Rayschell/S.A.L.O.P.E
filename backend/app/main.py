@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
 from .routers import auth, events, export, import_historique, members, public, saisons
@@ -17,6 +18,17 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Cookie de session signé, uniquement pour le state/nonce du flow OIDC
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="oidc_session",
+    max_age=600,
+    same_site="lax",
+    https_only=settings.COOKIE_SECURE,
+    path="/api/auth",
 )
 
 app.include_router(auth.router)

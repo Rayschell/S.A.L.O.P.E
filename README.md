@@ -318,9 +318,15 @@ echo -n 'votre-mot-de-passe-postgres' | base64
 openssl rand -base64 32 | tr -d '\n' | base64   # pour SECRET_KEY
 ```
 
+Ajoutez aussi le client OAuth Google (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) : dans la console Google Cloud, déclarez l'URI de redirection `https://planning.lateb.eu/api/auth/google/callback`. Ne commitez pas ces valeurs ; le plus simple est de les poser après coup :
+
+```bash
+kubectl patch secret salope-secret -n salope -p '{"stringData":{"GOOGLE_CLIENT_ID":"...","GOOGLE_CLIENT_SECRET":"..."}}'
+```
+
 ### 3. Adapter la configuration
 
-- `k8s/configmap.yaml` et `k8s/ingress.yaml` : domaine (`lateb.eu`, frontend sur `planning.lateb.eu`).
+- `k8s/configmap.yaml` et `k8s/ingress.yaml` : domaine (`lateb.eu`, frontend sur `planning.lateb.eu`), `GOOGLE_REDIRECT_URI` et `BUREAU_EMAILS`.
 - `k8s/backend-deployment.yaml` et `k8s/frontend-deployment.yaml` : `your-registry/salope-*:latest` → vos images.
 
 ### 4. Appliquer les manifests
