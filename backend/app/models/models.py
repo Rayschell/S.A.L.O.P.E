@@ -13,6 +13,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
 )
@@ -115,6 +116,10 @@ class Event(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     inscriptions_deadline = Column(DateTime, nullable=True)
+    # Logo de l'export PNG — NULL = logo LATEB original
+    logo_id = Column(
+        Integer, ForeignKey("logos.id", ondelete="SET NULL"), nullable=True
+    )
 
     slots = relationship(
         "Slot", back_populates="event", cascade="all, delete-orphan"
@@ -286,6 +291,24 @@ class PendingSubmission(Base):
             "evenement_id", "nom_normalise", name="uq_pending_submission_event_nom"
         ),
     )
+
+
+class Logo(Base):
+    """Logo importé (ex : spécial Halloween), choisissable par événement pour l'export PNG.
+
+    `contenu` est toujours un PNG RGBA normalisé (bords transparents rognés).
+    """
+
+    __tablename__ = "logos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String, nullable=False)
+    contenu = Column(LargeBinary, nullable=False)
+    # Thème de l'export dérivé des couleurs du logo (sinon thème LATEB)
+    utiliser_couleurs = Column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
 
 
 class Saison(Base):

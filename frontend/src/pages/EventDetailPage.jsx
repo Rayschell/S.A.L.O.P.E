@@ -13,6 +13,8 @@ import ParticipantsFilter from '../components/events/ParticipantsFilter.jsx'
 import PlanningGrid from '../components/planning/PlanningGrid.jsx'
 import WarningsList from '../components/planning/WarningsList.jsx'
 import ProposalCompareModal from '../components/planning/ProposalCompareModal.jsx'
+import LogoPicker from '../components/events/LogoPicker.jsx'
+import { logosApi } from '../api/logos.js'
 import Badge from '../components/ui/Badge.jsx'
 import { toast } from '../components/ui/Toaster.jsx'
 import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload, IconCopy, IconArrowBackUp, IconAlertTriangle, IconLayoutColumns } from '@tabler/icons-react'
@@ -50,6 +52,7 @@ export default function EventDetailPage() {
   const [highlight, setHighlight] = useState(null) // { slotId, memberId }
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [showProposals, setShowProposals] = useState(false)
+  const [showLogoPicker, setShowLogoPicker] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Pile d'annulation : chaque entrée = liste d'opérations inverses identifiées
@@ -210,6 +213,11 @@ export default function EventDetailPage() {
     }
   }
 
+  const handleSelectLogo = async (logoId) => {
+    const ev = await eventsApi.setLogo(id, logoId)
+    setEvent((prev) => ({ ...prev, logo_id: ev.logo_id }))
+  }
+
   const handleCopyPng = async () => {
     setCopyingPng(true)
     try {
@@ -360,6 +368,18 @@ export default function EventDetailPage() {
                 {pngCopied ? 'Copié !' : copyingPng ? 'Copie…' : 'Copier'}
               </button>
             )}
+            <button
+              onClick={() => setShowLogoPicker(true)}
+              title="Choisir le logo de l'export PNG"
+              style={actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)')}
+            >
+              <img
+                src={logosApi.imageUrl(event.logo_id)}
+                alt=""
+                style={{ height: 16, width: 16, objectFit: 'contain' }}
+              />
+              Logo
+            </button>
           </div>
         )}
       </div>
@@ -511,6 +531,14 @@ export default function EventDetailPage() {
           excludedMemberIds={excludedMemberIds}
           onApply={handleApplyProposal}
           onClose={() => setShowProposals(false)}
+        />
+      )}
+
+      {showLogoPicker && (
+        <LogoPicker
+          currentLogoId={event.logo_id ?? null}
+          onSelect={handleSelectLogo}
+          onClose={() => setShowLogoPicker(false)}
         />
       )}
 
