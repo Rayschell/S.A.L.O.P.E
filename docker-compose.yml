@@ -26,12 +26,18 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    # GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET viennent de backend/.env
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       DATABASE_URL: postgresql://baruser:barpassword@postgres:5432/salope
       SECRET_KEY: dev-secret-key-change-in-production
       ALLOWED_EMAIL_DOMAIN: lateb.eu
       CORS_ORIGINS: http://localhost:3000
       FUZZY_MATCH_THRESHOLD: "90"
+      GOOGLE_REDIRECT_URI: http://localhost:3000/api/auth/google/callback
+      BUREAU_EMAILS: zachee.descamps@lateb.eu
     volumes:
       # Hot-reload : le code source est monté en live
       - ./backend/app:/app/app
