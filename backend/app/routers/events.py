@@ -18,6 +18,7 @@ from ..models.models import (
     Event,
     EventStatutEnum,
     EventTypeEnum,
+    Logo,
     Member,
     PendingSubmission,
     ResponsableBar,
@@ -25,6 +26,7 @@ from ..models.models import (
     StatsMemberHeureRelative,
 )
 from ..schemas.schemas import (
+    EventLogoUpdate,
     AffinityCreate,
     AffinityRead,
     ApplyProposalRequest,
@@ -998,6 +1000,23 @@ def set_exclusions(
     event.excluded_member_ids = body.member_ids
     db.commit()
     return event.excluded_member_ids
+
+
+@router.put("/{event_id}/logo", response_model=EventRead)
+def set_event_logo(
+    event_id: int,
+    body: EventLogoUpdate,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """Choisit le logo de l'export PNG. Autorisé même publié (n'affecte ni planning ni stats)."""
+    event = _get_event_or_404(db, event_id)
+    if body.logo_id is not None and db.get(Logo, body.logo_id) is None:
+        raise HTTPException(status_code=404, detail="Logo introuvable")
+    event.logo_id = body.logo_id
+    db.commit()
+    db.refresh(event)
+    return event
 
 
 # ---------------------------------------------------------------------------

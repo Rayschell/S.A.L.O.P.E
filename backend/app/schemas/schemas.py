@@ -131,6 +131,7 @@ class EventRead(BaseModel):
     date: datetime
     type: EventTypeEnum
     statut: EventStatutEnum
+    logo_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -141,6 +142,10 @@ class EventReadDetail(EventRead):
     last_warnings: Optional[List[dict]] = None
 
     model_config = {"from_attributes": True}
+
+
+class EventLogoUpdate(BaseModel):
+    logo_id: Optional[int] = None  # None = logo LATEB original
 
 
 class ExclusionsUpdate(BaseModel):
@@ -584,3 +589,21 @@ class HistoricalImportRequest(BaseModel):
 class HistoricalImportResult(BaseModel):
     event_id: int
     assignments_created: int
+
+
+# ---------------------------------------------------------------------------
+# Logo
+# ---------------------------------------------------------------------------
+
+
+class LogoRead(BaseModel):
+    id: int
+    nom: str
+    created_at: datetime
+    utiliser_couleurs: bool
+    # Aperçu du thème dérivé : cadre, fond, Respo bar, Staff (None = pas de couleur vive)
+    couleurs: Optional[List[str]] = None
+
+
+class LogoUpdate(BaseModel):
+    utiliser_couleurs: bool
