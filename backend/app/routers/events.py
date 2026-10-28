@@ -56,6 +56,12 @@ from ..schemas.schemas import (
     WarningItem,
 )
 from ..services import csv_import as csv_svc
+from ..services.event_creation import (
+    EventPublieError,
+    add_slots,
+    new_event,
+    recompute_heures_relatives,
+)
 from ..services import public_poll
 from ..services.scheduler import (
     check_manual_assignment,
@@ -85,13 +91,7 @@ def create_event(
     db: Session = Depends(get_db),
     _: Member = Depends(require_bureau),
 ):
-    event = Event(
-        nom=payload.nom,
-        date=payload.date,
-        type=payload.type,
-        public_token=secrets.token_urlsafe(16),
-    )
-    db.add(event)
+    event = new_event(db, payload.nom, payload.date, payload.type)
     db.commit()
     db.refresh(event)
     return event
@@ -382,18 +382,6 @@ def update_slot(
     return slot
 
 
-def _recompute_heures_relatives(db: Session, event_id: int) -> None:
-    """heure_relative = index du créneau trié par heure_debut (0, 1, 2…)."""
-    slots = (
-        db.query(Slot)
-        .filter(Slot.evenement_id == event_id)
-        .order_by(Slot.heure_debut)
-        .all()
-    )
-    for idx, slot in enumerate(slots):
-        slot.heure_relative = idx
-
-
 @router.post(
     "/{event_id}/slots",
     response_model=List[SlotRead],
@@ -411,37 +399,13 @@ def create_slots(
     ce qui permet de relancer un générateur sur une plage élargie.
     """
     event = _get_event_or_404(db, event_id)
-    if event.statut == EventStatutEnum.publie:
-        raise HTTPException(
-            status_code=400, detail="Événement publié : créneaux verrouillés"
-        )
-    existing = {
-        (s.heure_debut, s.heure_fin)
-        for s in db.query(Slot).filter(Slot.evenement_id == event_id)
-    }
-    for item in payload.slots:
-        key = (item.heure_debut, item.heure_fin)
-        if key in existing:
-            continue
-        existing.add(key)
-        db.add(
-            Slot(
-                evenement_id=event_id,
-                heure_debut=item.heure_debut,
-                heure_fin=item.heure_fin,
-                heure_relative=0,
-                max_personnes=payload.max_personnes,
-            )
-        )
-    db.flush()
-    _recompute_heures_relatives(db, event_id)
+    ranges = [(item.heure_debut, item.heure_fin) for item in payload.slots]
+    try:
+        slots = add_slots(db, event, ranges, payload.max_personnes)
+    except EventPublieError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     db.commit()
-    return (
-        db.query(Slot)
-        .filter(Slot.evenement_id == event_id)
-        .order_by(Slot.heure_debut)
-        .all()
-    )
+    return slots
 
 
 @router.delete("/{event_id}/slots/{slot_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -484,7 +448,7 @@ def delete_slot(
 
     db.delete(slot)
     db.flush()
-    _recompute_heures_relatives(db, event_id)
+    recompute_heures_relatives(db, event_id)
     db.commit()
 
 

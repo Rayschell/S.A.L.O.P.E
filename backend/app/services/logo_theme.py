@@ -119,7 +119,7 @@ def extract_theme(png: bytes) -> Optional[Dict[str, RGB]]:
     """Thème complet de l'export, ou None si le logo n'a aucune couleur vive."""
     img = Image.open(io.BytesIO(png)).convert("RGBA")
     img.thumbnail((SAMPLE_SIDE, SAMPLE_SIDE))
-    opaque = [p[:3] for p in img.getdata() if p[3] >= 200]
+    opaque = [p[:3] for p in img.get_flattened_data() if p[3] >= 200]
     if not opaque:
         return None
 

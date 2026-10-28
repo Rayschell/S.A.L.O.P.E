@@ -30,3 +30,14 @@ def test_email_allowed():
     assert email_allowed("x@lateb.eu")
     assert not email_allowed("x@gmail.com")
     assert not email_allowed("x@evil-lateb.eu")
+
+
+def test_safe_next():
+    from app.routers.auth import safe_next
+
+    assert safe_next("/api/oauth/authorize?x=1") == "/api/oauth/authorize?x=1"
+    assert safe_next("https://evil.com") is None
+    assert safe_next("//evil.com") is None
+    assert safe_next("/events") is None
+    assert safe_next("/api/oauth/authorize/../../evil") is None
+    assert safe_next(None) is None

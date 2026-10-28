@@ -54,6 +54,11 @@ spec:
                 configMapKeyRef:
                   name: salope-config
                   key: CORS_ORIGINS
+            - name: PUBLIC_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: salope-config
+                  key: PUBLIC_BASE_URL
             - name: FUZZY_MATCH_THRESHOLD
               valueFrom:
                 configMapKeyRef:
