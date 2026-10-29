@@ -190,3 +190,17 @@ def theme_swatches(theme: Dict[str, RGB]) -> List[str]:
     Pas de Respo bar / Staff : les bulles gardent les couleurs LATEB à l'export.
     """
     return [hex_color(theme[k]) for k in ("frame", "bg", "band", "brand")]
+
+
+def logo_et_theme(db, event) -> Tuple[Optional[bytes], Optional[Dict[str, RGB]]]:
+    """(logo PNG, thème) de l'événement — même règle pour l'export et l'aperçu.
+
+    Pas de logo → (None, None) : logo et thème LATEB. Logo importé → son PNG,
+    et son thème seulement si `utiliser_couleurs` (sinon thème LATEB).
+    """
+    from ..models.models import Logo
+
+    logo = db.get(Logo, event.logo_id) if event.logo_id else None
+    if logo is None:
+        return None, None
+    return logo.contenu, extract_theme(logo.contenu) if logo.utiliser_couleurs else None
