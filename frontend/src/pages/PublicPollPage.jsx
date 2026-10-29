@@ -33,10 +33,7 @@ export default function PublicPollPage() {
   useEffect(() => {
     publicApi
       .getPoll(token)
-      .then((data) => {
-        setPoll(data)
-        setReponses(Object.fromEntries(data.slots.map((s) => [s.id, 'no'])))
-      })
+      .then(setPoll)
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
   }, [token])
@@ -54,15 +51,19 @@ export default function PublicPollPage() {
   const setAll = (statut) =>
     setReponses(Object.fromEntries(poll.slots.map((s) => [s.id, statut])))
 
+  // Aucune réponse présélectionnée : chaque créneau doit être renseigné
+  const nbSansReponse = poll ? poll.slots.filter((s) => !reponses[s.id]).length : 0
+  const cannotSubmit = !poll?.ouvert || !nom.trim() || nbSansReponse > 0 || busy
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!nom.trim() || busy) return
+    if (cannotSubmit) return
     setBusy(true)
     setError('')
     try {
       const payload = {
         nom: nom.trim(),
-        reponses: poll.slots.map((s) => ({ creneau_id: s.id, statut: reponses[s.id] || 'no' })),
+        reponses: poll.slots.map((s) => ({ creneau_id: s.id, statut: reponses[s.id] })),
       }
       const res = await publicApi.submit(token, payload)
       setResult(res.status)
@@ -192,7 +193,7 @@ export default function PublicPollPage() {
                 </span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
                   {STATUTS.map(({ value, label, icon: Icon, color, soft }) => {
-                    const active = (reponses[slot.id] || 'no') === value
+                    const active = reponses[slot.id] === value
                     return (
                       <button
                         key={value}
@@ -228,13 +229,21 @@ export default function PublicPollPage() {
           </div>
         )}
 
+        {poll.ouvert && nbSansReponse > 0 && (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            {nbSansReponse === poll.slots.length
+              ? 'Indique ta disponibilité pour chaque créneau.'
+              : `Encore ${nbSansReponse} créneau${nbSansReponse > 1 ? 'x' : ''} sans réponse.`}
+          </p>
+        )}
+
         <button
           type="submit"
-          disabled={!poll.ouvert || !nom.trim() || busy}
+          disabled={cannotSubmit}
           style={{
             ...primaryBtnStyle,
-            cursor: !poll.ouvert || !nom.trim() || busy ? 'not-allowed' : 'pointer',
-            opacity: !poll.ouvert || !nom.trim() || busy ? 0.55 : 1,
+            cursor: cannotSubmit ? 'not-allowed' : 'pointer',
+            opacity: cannotSubmit ? 0.55 : 1,
           }}
         >
           {busy ? 'Envoi…' : 'Envoyer mes disponibilités'}
