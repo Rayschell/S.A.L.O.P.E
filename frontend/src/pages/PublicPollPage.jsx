@@ -6,7 +6,7 @@ import { IconGlassFull, IconCheck, IconQuestionMark, IconX } from '@tabler/icons
 const STATUTS = [
   { value: 'yes', label: 'Dispo', icon: IconCheck, color: 'var(--green)', soft: 'var(--green-soft)' },
   { value: 'maybe', label: 'Peut-être', icon: IconQuestionMark, color: 'var(--amber)', soft: 'var(--amber-soft)' },
-  { value: 'no', label: 'Pas dispo', icon: IconX, color: 'var(--text-muted)', soft: 'var(--bg-high)' },
+  { value: 'no', label: 'Pas dispo', icon: IconX, color: 'var(--red)', soft: 'var(--red-soft)' },
 ]
 
 const CLOSED_MESSAGES = {
@@ -50,6 +50,9 @@ export default function PublicPollPage() {
 
   const fmtHour = (iso) =>
     new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
+
+  const setAll = (statut) =>
+    setReponses(Object.fromEntries(poll.slots.map((s) => [s.id, statut])))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -148,7 +151,32 @@ export default function PublicPollPage() {
         </div>
 
         <div>
-          <label style={labelStyle}>Mes disponibilités</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>Mes disponibilités</label>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+              {[
+                { value: 'yes', label: 'Dispo partout' },
+                { value: 'no', label: 'Pas dispo partout' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={!poll.ouvert}
+                  onClick={() => setAll(value)}
+                  style={{
+                    padding: '4px 8px', fontSize: 11.5, borderRadius: 'var(--radius-sm)',
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: poll.ouvert ? 'pointer' : 'not-allowed',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {poll.slots.map((slot) => (
               <div

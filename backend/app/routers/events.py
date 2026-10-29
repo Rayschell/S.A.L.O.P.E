@@ -642,6 +642,27 @@ def add_assignment(
     return asgn
 
 
+@router.delete("/{event_id}/assignments", status_code=status.HTTP_204_NO_CONTENT)
+def clear_assignments(
+    event_id: int,
+    db: Session = Depends(get_db),
+    _: Member = Depends(require_bureau),
+):
+    """Vide entièrement le planning (affectations auto ET manuelles)."""
+    event = _get_event_or_404(db, event_id)
+    if event.statut == EventStatutEnum.publie:
+        raise HTTPException(status_code=400, detail="Event already published")
+    slot_ids = [
+        s.id
+        for s in db.query(Slot).filter(Slot.evenement_id == event_id).all()
+    ]
+    db.query(Assignment).filter(
+        Assignment.creneau_id.in_(slot_ids)
+    ).delete(synchronize_session=False)
+    event.last_warnings = []
+    db.commit()
+
+
 @router.put("/{event_id}/assignments/{asgn_id}", response_model=AssignmentRead)
 def update_assignment(
     event_id: int,

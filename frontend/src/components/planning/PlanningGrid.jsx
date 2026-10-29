@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { IconPlus, IconUserPlus, IconArrowBackUp } from '@tabler/icons-react'
+import { IconPlus, IconUserPlus, IconArrowBackUp, IconTrash } from '@tabler/icons-react'
 import { eventsApi } from '../../api/events.js'
 import PlanningLegend from './PlanningLegend.jsx'
 import '../../styles/planning.css'
@@ -16,6 +16,8 @@ export default function PlanningGrid({
   onUndoableAction,
   canUndo = false,
   onUndo,
+  canClear = false,
+  onClear,
   eventId,
   disabled,
   highlight,
@@ -430,21 +432,41 @@ export default function PlanningGrid({
       {/* Legend + actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px 4px', flexWrap: 'wrap' }}>
         {addButton}
-        {!disabled && canUndo && (
-          <button
-            onClick={onUndo}
-            title="Annuler la dernière modification (Ctrl+Z)"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-              padding: '6px 12px', fontSize: 13, cursor: 'pointer',
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            <IconArrowBackUp size={13} stroke={1.5} />
-            Annuler (Ctrl+Z)
-          </button>
+        {!disabled && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="Annuler la dernière modification (Ctrl+Z)"
+              style={{
+                ...footerBtnStyle,
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                opacity: canUndo ? 1 : 0.4,
+                cursor: canUndo ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <IconArrowBackUp size={13} stroke={1.5} />
+              Annuler (Ctrl+Z)
+            </button>
+            {onClear && (
+              <button
+                onClick={onClear}
+                disabled={!canClear}
+                title="Supprimer toutes les affectations pour repartir d'un planning vide"
+                style={{
+                  ...footerBtnStyle,
+                  color: canClear ? 'var(--red)' : 'var(--text-secondary)',
+                  border: `1px solid ${canClear ? 'rgba(240, 82, 82, 0.3)' : 'var(--border)'}`,
+                  opacity: canClear ? 1 : 0.4,
+                  cursor: canClear ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <IconTrash size={13} stroke={1.5} />
+                Vider le planning
+              </button>
+            )}
+          </div>
         )}
         {!disabled && (
           <span style={{ fontSize: 14, color: 'var(--accent)', marginLeft: 'auto' }}>
@@ -471,3 +493,11 @@ const editorBtn = (bg, color) => ({
   fontFamily: "'DM Sans', sans-serif",
   transition: 'background 120ms ease',
 })
+
+const footerBtnStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'var(--bg-elevated)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '6px 12px', fontSize: 13,
+  fontFamily: "'DM Sans', sans-serif",
+}
