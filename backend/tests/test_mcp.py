@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from contextlib import contextmanager
 from datetime import date, datetime
 
@@ -246,3 +247,32 @@ def test_mcp_modern_protocol_2026_07_28(mcp_client, bureau_token):
     )
     assert r.status_code == 200, r.text
     assert r.json()["result"]["isError"] is False
+
+
+def test_tool_call_logged_with_member(mcp_client, bureau_token, bureau_member, caplog):
+    caplog.set_level(logging.INFO, logger="app.mcp")
+    data = tool_data(
+        call_tool(
+            mcp_client,
+            bureau_token,
+            "create_event",
+            {
+                "nom": "Log",
+                "type": "soiree",
+                "date": "2026-11-06",
+                "heure_debut": "22:00",
+                "heure_fin": "23:00",
+            },
+        )
+    )
+    call_tool(mcp_client, bureau_token, "get_event", {"event_id": 999999})
+
+    records = [r for r in caplog.records if r.name == "app.mcp"]
+    ok, erreur = records[-2], records[-1]
+    assert ok.tool == "create_event"
+    assert ok.membre_id == bureau_member.id
+    assert ok.statut == "ok"
+    assert ok.event_id == data["event"]["id"]
+    assert erreur.tool == "get_event"
+    assert erreur.statut == "erreur_usage"
+    assert erreur.membre_id == bureau_member.id

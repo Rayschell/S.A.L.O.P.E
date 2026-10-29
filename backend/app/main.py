@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,6 +13,13 @@ from .config import settings
 from .mcp.server import mcp_asgi_app, mcp_lifespan
 from .routers import auth, events, export, import_historique, logos, members, oauth, public, saisons
 
+# Logs applicatifs (loggers "app.*") sur stdout : uvicorn ne configure que les siens
+_app_logger = logging.getLogger("app")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    _app_logger.addHandler(_handler)
+    _app_logger.setLevel(logging.INFO)
 
 
 @asynccontextmanager

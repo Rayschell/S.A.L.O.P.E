@@ -120,6 +120,9 @@ def test_authorize_shows_consent(anon, oauth_client, bureau_member):
     assert r.status_code == 200
     assert "Claude &lt;Code&gt;" in r.text  # échappé
     assert "bureau@lateb.eu" in r.text
+    # Anti-clickjacking
+    assert r.headers["x-frame-options"] == "DENY"
+    assert r.headers["content-security-policy"] == "frame-ancestors 'none'"
 
 
 def test_consent_allow_redirects_with_code(anon, oauth_client, bureau_member):

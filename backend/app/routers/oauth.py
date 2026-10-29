@@ -6,6 +6,7 @@ token et révocation. Clients publics uniquement, PKCE S256 obligatoire.
 from __future__ import annotations
 
 import time
+from collections import defaultdict, deque
 from html import escape
 from typing import Optional
 from urllib.parse import urlencode, urlsplit, urlunsplit
@@ -89,8 +90,31 @@ def openid_configuration():
 # ---------------------------------------------------------------------------
 
 
+# Rate-limit DCR : 10 enregistrements / 10 min / IP (in-memory — mono-réplique)
+_REGISTER_ATTEMPTS: dict[str, deque] = defaultdict(deque)
+_REGISTER_MAX_ATTEMPTS = 10
+_REGISTER_WINDOW_SECONDS = 600.0
+
+
+def _register_rate_limited(ip: str) -> bool:
+    now = time.monotonic()
+    attempts = _REGISTER_ATTEMPTS[ip]
+    while attempts and now - attempts[0] > _REGISTER_WINDOW_SECONDS:
+        attempts.popleft()
+    if len(attempts) >= _REGISTER_MAX_ATTEMPTS:
+        return True
+    attempts.append(now)
+    return False
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(request: Request, db: Session = Depends(get_db)):
+    if _register_rate_limited(request.client.host if request.client else "unknown"):
+        return JSONResponse(
+            {"error": "slow_down", "error_description": "Trop d'enregistrements, réessaie plus tard"},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": str(int(_REGISTER_WINDOW_SECONDS))},
+        )
     try:
         payload = await request.json()
     except ValueError:
@@ -101,6 +125,8 @@ async def register(request: Request, db: Session = Depends(get_db)):
     if not isinstance(redirect_uris, list):
         redirect_uris = []
     client_name = payload.get("client_name")
+    # Nettoyage opportuniste : l'endpoint est rate-limité, donc le coût reste borné
+    oauth_store.purge_expired(db)
     try:
         client = oauth_store.register_client(
             db, client_name if isinstance(client_name, str) else None, redirect_uris
@@ -195,7 +221,13 @@ h1{{font-size:1.2rem;margin:0 0 12px}} p{{line-height:1.5}}
 button{{flex:1;padding:10px;border-radius:8px;border:1px solid #d4d4d8;font-size:1rem;cursor:pointer;background:#fff}}
 button.primary{{background:#18181b;color:#fff;border-color:#18181b}}
 </style></head><body><main>{body}</main></body></html>"""
-    return HTMLResponse(html, status_code=status_code, headers={"Cache-Control": "no-store"})
+    # Anti-clickjacking : la page de consentement ne doit jamais être affichée en iframe
+    headers = {
+        "Cache-Control": "no-store",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none'",
+    }
+    return HTMLResponse(html, status_code=status_code, headers=headers)
 
 
 def _error_page(message: str, status_code: int = status.HTTP_400_BAD_REQUEST) -> HTMLResponse:

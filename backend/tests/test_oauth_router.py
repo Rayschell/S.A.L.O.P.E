@@ -155,3 +155,30 @@ def test_revoke_token(client, db_session, bureau_member):
     r = client.post("/api/oauth/revoke", data={"token": pair.access_token})
     assert r.status_code == 200
     assert oauth_store.member_for_access_token(db_session, pair.access_token) is None
+
+
+def test_register_rate_limited(client):
+    for _ in range(10):
+        _register(client)
+    r = client.post(
+        "/api/oauth/register",
+        json={"client_name": "Spam", "redirect_uris": [REDIRECT]},
+    )
+    assert r.status_code == 429
+    assert r.headers["retry-after"] == "600"
+
+
+def test_register_too_many_redirect_uris(client):
+    uris = [f"http://localhost:{1000 + i}/cb" for i in range(11)]
+    r = client.post("/api/oauth/register", json={"redirect_uris": uris})
+    assert r.status_code == 400
+    assert r.json()["error"] == "invalid_redirect_uri"
+
+
+def test_register_redirect_uri_too_long(client):
+    r = client.post(
+        "/api/oauth/register",
+        json={"redirect_uris": ["http://localhost:1/" + "a" * 2100]},
+    )
+    assert r.status_code == 400
+    assert r.json()["error"] == "invalid_redirect_uri"

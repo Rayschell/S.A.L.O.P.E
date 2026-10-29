@@ -212,3 +212,29 @@ def test_matches_rejects_userinfo():
     assert not oauth_store.redirect_uri_matches(
         ["http://localhost:1/cb"], "http://localhost:2@evil.com/cb"
     )
+
+
+def test_purge_expired(db_session, oauth_client, bureau_member, shift_now):
+    from app.models.models import OAuthAuthorizationCode, OAuthClient, OAuthToken
+
+    _code(db_session, oauth_client, bureau_member)
+    used = oauth_store.issue_tokens(db_session, oauth_client.client_id, bureau_member.id)
+    # Refresh consommé (révoqué) mais non expiré : à garder pour détecter sa réutilisation
+    oauth_store.refresh_tokens(db_session, oauth_client.client_id, used.refresh_token)
+    orphan = oauth_store.register_client(db_session, "Orphelin", [REDIRECT])
+
+    shift_now(timedelta(days=2))  # codes et access expirés, refresh (30 j) encore valides
+    orphan.created_at = oauth_store._now() - timedelta(days=2)
+    db_session.flush()
+    oauth_store.purge_expired(db_session)
+
+    assert db_session.query(OAuthAuthorizationCode).count() == 0
+    assert {t.type for t in db_session.query(OAuthToken)} == {"refresh"}
+    revoked = db_session.query(OAuthToken).filter(
+        OAuthToken.token_hash == oauth_store.hash_secret(used.refresh_token)
+    ).one()
+    assert revoked.revoked_at is not None
+    # Le client actif (refresh encore valides) reste, l'orphelin disparaît
+    remaining = {c for (c,) in db_session.query(OAuthClient.client_id)}
+    assert oauth_client.client_id in remaining
+    assert orphan.client_id not in remaining

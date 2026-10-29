@@ -1,11 +1,14 @@
 """Serveur MCP (SDK officiel 2.x, streamable HTTP stateless, réponses JSON)."""
 from __future__ import annotations
 
+import json
+import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Optional
 
 import anyio
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.types import ToolAnnotations
@@ -22,27 +25,54 @@ mcp = MCPServer(
     ),
 )
 
+logger = logging.getLogger("app.mcp")
+
 _LECTURE = ToolAnnotations(readOnlyHint=True, destructiveHint=False)
 
 
-async def _run(fn: Callable[..., Any], *args) -> Any:
-    """Exécute un tool (SQLAlchemy synchrone) dans un thread, hors de la boucle async."""
+def _membre_id(ctx: Context) -> Optional[int]:
+    """Membre authentifié, posé dans le scope ASGI par BearerAuthMiddleware."""
+    request = ctx.request_context.request
+    return getattr(getattr(request, "state", None), "membre_id", None)
+
+
+async def _run(ctx: Context, fn: Callable[..., Any], *args) -> Any:
+    """Exécute un tool (SQLAlchemy synchrone) dans un thread, hors de la boucle async.
+
+    Chaque appel est tracé (qui, quel tool, résultat, durée) : un agent IA écrit en base.
+    """
 
     def _call():
         with context.open_session() as db:
             return fn(db, *args)
 
+    log = {"tool": fn.__name__, "membre_id": _membre_id(ctx), "arguments": list(args)}
+    start = time.monotonic()
     try:
-        return await anyio.to_thread.run_sync(_call)
+        result = await anyio.to_thread.run_sync(_call)
     except ValueError as exc:
+        _log_call(log, start, "erreur_usage", erreur=str(exc))
         # Erreur d'usage (entrée invalide, event introuvable) : renvoyée au modèle en isError
         raise ToolError(str(exc)) from exc
+    except Exception as exc:
+        _log_call(log, start, "erreur", erreur=repr(exc), level=logging.ERROR)
+        raise
+    if isinstance(result, dict) and isinstance(result.get("event"), dict):
+        log["event_id"] = result["event"].get("id")
+    _log_call(log, start, "ok")
+    return result
+
+
+def _log_call(log: dict, start: float, statut: str, level: int = logging.INFO, **extra) -> None:
+    log = {**log, "statut": statut, "duree_ms": round((time.monotonic() - start) * 1000), **extra}
+    logger.log(level, "mcp.tool_call %s", json.dumps(log, ensure_ascii=False, default=str), extra=log)
 
 
 @mcp.tool(
     annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 )
 async def create_event(
+    ctx: Context,
     nom: str,
     type: str,
     date: str,
@@ -65,12 +95,21 @@ async def create_event(
                  heure_debut="18:00", heure_fin="20:00") → 2 créneaux d'une heure.
     """
     return await _run(
-        tools.create_event, nom, type, date, heure_debut, heure_fin, max_personnes, duree_creneau_minutes
+        ctx,
+        tools.create_event,
+        nom,
+        type,
+        date,
+        heure_debut,
+        heure_fin,
+        max_personnes,
+        duree_creneau_minutes,
     )
 
 
 @mcp.tool(annotations=_LECTURE)
 async def list_events(
+    ctx: Context,
     statut: Optional[str] = None,
     type: Optional[str] = None,
     depuis: Optional[str] = None,
@@ -82,22 +121,22 @@ async def list_events(
     Filtres optionnels : statut ("brouillon" | "publie"), type ("afterwork" | "soiree"),
     depuis / jusqu_a (AAAA-MM-JJ, inclus). Exemple : list_events(statut="brouillon").
     """
-    return await _run(tools.list_events, statut, type, depuis, jusqu_a, limite)
+    return await _run(ctx, tools.list_events, statut, type, depuis, jusqu_a, limite)
 
 
 @mcp.tool(annotations=_LECTURE)
-async def get_event(event_id: int) -> dict:
+async def get_event(ctx: Context, event_id: int) -> dict:
     """Détail d'un événement : créneaux et état du formulaire de disponibilités.
 
     Exemple : get_event(event_id=21).
     """
-    return await _run(tools.get_event, event_id)
+    return await _run(ctx, tools.get_event, event_id)
 
 
 @mcp.tool(annotations=_LECTURE)
-async def list_saisons() -> list[dict]:
+async def list_saisons(ctx: Context) -> list[dict]:
     """Liste les saisons (mandats de bureau). date_fin null = saison en cours."""
-    return await _run(tools.list_saisons)
+    return await _run(ctx, tools.list_saisons)
 
 
 class _McpEndpoint:

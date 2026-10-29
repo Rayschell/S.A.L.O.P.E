@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
+from sqlalchemy import exists
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -22,6 +23,11 @@ from ..models.models import Member, OAuthAuthorizationCode, OAuthClient, OAuthTo
 
 CODE_TTL = timedelta(minutes=5)
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+# DCR ouvert sans auth : on borne ce qu'un appel peut stocker
+MAX_REDIRECT_URIS = 10
+MAX_REDIRECT_URI_LENGTH = 2048
+# Un client sans code ni token depuis ce délai est abandonné
+ORPHAN_CLIENT_TTL = timedelta(days=1)
 
 
 class OAuthError(Exception):
@@ -112,8 +118,16 @@ def register_client(
 ) -> OAuthClient:
     if not redirect_uris:
         raise OAuthError("invalid_redirect_uri", "Au moins une redirect_uri est requise")
+    if len(redirect_uris) > MAX_REDIRECT_URIS:
+        raise OAuthError(
+            "invalid_redirect_uri", f"{MAX_REDIRECT_URIS} redirect_uris maximum"
+        )
     for uri in redirect_uris:
-        if not isinstance(uri, str) or not redirect_uri_allowed(uri):
+        if (
+            not isinstance(uri, str)
+            or len(uri) > MAX_REDIRECT_URI_LENGTH
+            or not redirect_uri_allowed(uri)
+        ):
             raise OAuthError("invalid_redirect_uri", f"redirect_uri non autorisée : {uri}")
     client = OAuthClient(
         client_id=secrets.token_urlsafe(24),
@@ -124,6 +138,27 @@ def register_client(
     db.add(client)
     db.flush()
     return client
+
+
+def purge_expired(db: Session) -> None:
+    """Supprime codes et tokens expirés, puis les clients orphelins.
+
+    Un refresh révoqué mais non expiré est conservé : il sert à détecter sa
+    réutilisation (révocation de famille).
+    """
+    now = _now()
+    db.query(OAuthAuthorizationCode).filter(
+        OAuthAuthorizationCode.expires_at <= now
+    ).delete(synchronize_session=False)
+    db.query(OAuthToken).filter(OAuthToken.expires_at <= now).delete(
+        synchronize_session=False
+    )
+    has_code = exists().where(OAuthAuthorizationCode.client_id == OAuthClient.client_id)
+    has_token = exists().where(OAuthToken.client_id == OAuthClient.client_id)
+    db.query(OAuthClient).filter(
+        OAuthClient.created_at <= now - ORPHAN_CLIENT_TTL, ~has_code, ~has_token
+    ).delete(synchronize_session=False)
+    db.flush()
 
 
 def get_client(db: Session, client_id: str) -> Optional[OAuthClient]:
