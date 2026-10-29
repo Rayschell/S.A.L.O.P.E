@@ -5,12 +5,17 @@ import io
 from datetime import datetime, timedelta
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from app.config import settings
 from app.models.models import Event, EventTypeEnum, Logo, Slot
 from app.services.apercu import page_apercu_html, textes_apercu
-from app.services.apercu_img import rendre_apercu_png, texte_affichable
+from app.services.apercu_img import (
+    LARGEUR,
+    _ajuster_nom,
+    rendre_apercu_png,
+    texte_affichable,
+)
 from app.services.logo_theme import extract_theme, logo_et_theme
 from tests.test_public_poll import _make_event_with_slots, _open_poll
 
@@ -59,9 +64,17 @@ def test_page_apercu_html_balises_og():
         'name="twitter:card" content="summary_large_image"',
         'name="theme-color" content="#ff6200"',
         "<title>T</title>",
-        'http-equiv="refresh" content="0; url=https://x/dispo/abc"',
+        '<a href="https://x/dispo/abc">',
     ]:
         assert attendu in html
+
+
+def test_page_apercu_html_sans_redirection_auto():
+    # Un humain dont l'UA ressemble à un robot (navigateur intégré d'une appli)
+    # reçoit cette page : une redirection automatique vers /dispo/{token} le
+    # renverrait ici en boucle. Il n'a qu'un lien à cliquer.
+    html = page_apercu_html("T", "D", "https://x/dispo/abc", "https://x/img.png", "#ff6200")
+    assert "refresh" not in html
 
 
 def test_page_apercu_html_echappe():
@@ -99,6 +112,16 @@ def test_rendre_apercu_png_generique():
 def test_rendre_apercu_png_nom_tres_long():
     png = rendre_apercu_png("Grande soirée " * 8, "Samedi 31 octobre\n20h → 2h", None, None)
     assert _taille(png) == (1200, 630)
+
+
+@pytest.mark.parametrize("nom", ["Grande soirée " * 8, "Anticonstitutionnellement" * 3])
+def test_ajuster_nom_tient_sur_deux_lignes(nom):
+    draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    largeur = 600
+    font, lignes = _ajuster_nom(draw, nom, largeur)
+    assert len(lignes) <= 2
+    assert all(draw.textlength(l, font=font) <= largeur for l in lignes)
+    assert lignes[-1].endswith("…")
 
 
 def test_rendre_apercu_png_logo_importe_et_theme():

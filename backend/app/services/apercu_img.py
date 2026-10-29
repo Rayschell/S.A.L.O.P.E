@@ -89,6 +89,10 @@ def _ajuster_nom(draw: ImageDraw.ImageDraw, nom: str, largeur: int):
     lignes = _lignes(draw, nom, font, largeur)
     gardees = lignes[: NOM_LIGNES_MAX - 1]
     reste = " ".join(lignes[NOM_LIGNES_MAX - 1:])
+    if not reste:
+        # Un seul mot, trop large même à la plus petite taille : pas de 2e ligne
+        # vide, on force l'ellipse sur l'unique ligne.
+        return font, [_ellipse(draw, lignes[0], font, largeur)]
     gardees = [_ellipse(draw, l, font, largeur) for l in gardees]
     return font, gardees + [_ellipse(draw, reste, font, largeur)]
 

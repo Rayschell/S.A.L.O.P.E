@@ -3,8 +3,9 @@ Aperçu Open Graph des liens de dispos (/dispo/{token}).
 
 Les robots d'aperçu (Discord, WhatsApp, Telegram…) n'exécutent pas le JS de
 la SPA : on leur sert une petite page HTML dont le <head> porte les balises
-Open Graph (titre, description, image), et qui redirige un humain égaré vers
-le formulaire.
+Open Graph (titre, description, image), avec un simple lien vers le formulaire
+pour un humain égaré. Pas de redirection automatique : un navigateur dont l'UA
+ressemble à un robot serait renvoyé ici en boucle par nginx.
 """
 from __future__ import annotations
 
@@ -58,7 +59,6 @@ def page_apercu_html(
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="{c}">
-<meta http-equiv="refresh" content="0; url={u}">
 </head>
 <body>
 <p><a href="{u}">{t}</a></p>
