@@ -65,6 +65,7 @@ export const eventsApi = {
     client.put(`/events/${eventId}/assignments/${asgId}`, payload).then((r) => r.data),
   deleteAssignment: (eventId, asgId) =>
     client.delete(`/events/${eventId}/assignments/${asgId}`),
+  clearAssignments: (id) => client.delete(`/events/${id}/assignments`),
 
   // Availabilities
   listAvailabilities: (id) => client.get(`/events/${id}/availabilities`).then((r) => r.data),
