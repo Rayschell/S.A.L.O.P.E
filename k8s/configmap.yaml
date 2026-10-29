@@ -6,5 +6,7 @@ metadata:
 data:
   ALLOWED_EMAIL_DOMAIN: "lateb.eu"
   CORS_ORIGINS: "https://planning.lateb.eu"
+  # URL publique : issuer OAuth et ressource du serveur MCP (/api/mcp)
+  PUBLIC_BASE_URL: "https://planning.lateb.eu"
   FUZZY_MATCH_THRESHOLD: "90"
   DATABASE_URL: "postgresql://baruser:$(POSTGRES_PASSWORD)@salope-postgres:5432/salope"

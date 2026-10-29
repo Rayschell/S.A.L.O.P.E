@@ -106,6 +106,27 @@ Deux modes : `generate` (résout et persiste directement) et `generate-proposals
 - La stack undo du planning utilise `(creneau_id, membre_id)` comme clé naturelle, jamais l'id d'assignment.
 - Tests backend : pytest + `TestClient` FastAPI contre une vraie base `salope_test` (pas de mocks DB). Fixtures dans `tests/conftest.py`.
 
+## Serveur MCP (`/api/mcp`)
+
+Le backend expose un serveur MCP (SDK `mcp` 2.x, `MCPServer`, streamable HTTP stateless, protocole jusqu'à 2026-07-28) réservé au **bureau**, protégé par un serveur d'autorisation OAuth 2.1 maison adossé au login Google.
+
+- **`app/mcp/`** : `server.py` (tools + lifespan), `tools.py` (logique, fonctions pures sur `db`), `auth.py` (bearer + rôle bureau revérifié à chaque requête), `context.py` (session DB, monkeypatchée en test).
+- **`app/routers/oauth.py`** : découverte `/.well-known/oauth-protected-resource/api/mcp` + `/.well-known/oauth-authorization-server`, `/api/oauth/register` (DCR), `/authorize` (+ écran de consentement), `/token`, `/revoke`.
+- **`app/services/oauth_store.py`** : clients, codes PKCE S256, tokens opaques hashés (access 1 h, refresh 30 j avec rotation). Un token MCP n'est jamais un JWT web, et inversement.
+- Tools V1 : `create_event`, `list_events`, `get_event`, `list_saisons`. Catalogue complet prévu : `docs/superpowers/specs/2026-10-28-mcp-server-design.md`.
+
+Brancher un client :
+
+```bash
+claude mcp add --transport http planning http://localhost:3000/api/mcp     # dev
+claude mcp add --transport http planning https://planning.lateb.eu/api/mcp # prod
+# puis /mcp dans Claude Code → login Google → consentement
+```
+
+Sur claude.ai / Claude Desktop : Paramètres → Connecteurs → ajouter un connecteur personnalisé avec l'URL prod.
+
+Variables : `PUBLIC_BASE_URL` (issuer OAuth, doit être l'URL publique du front), `MCP_ACCESS_TOKEN_EXPIRE_MINUTES`, `MCP_REFRESH_TOKEN_EXPIRE_DAYS`, `MCP_ALLOWED_REDIRECT_URIS`. `/.well-known` doit être routé vers le backend (ingress + proxy Vite).
+
 ## Créer une migration Alembic
 
 ```bash

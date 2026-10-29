@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from typing import Optional
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -90,10 +91,26 @@ def login(
     return member
 
 
+_NEXT_ALLOWED = "/api/oauth/authorize"
+
+
+def safe_next(value: Optional[str]) -> Optional[str]:
+    """`next` post-login : uniquement l'authorize OAuth du MCP (anti open-redirect)."""
+    if not value or "\\" in value:
+        return None
+    if value == _NEXT_ALLOWED or value.startswith(_NEXT_ALLOWED + "?"):
+        return value
+    return None
+
+
 @router.get("/google/login")
-async def google_login(request: Request):
+async def google_login(request: Request, next: Optional[str] = None):
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Google login not configured")
+    # Retour vers l'authorize OAuth du MCP après le login, si demandé
+    request.session.pop("next", None)
+    if safe_next(next):
+        request.session["next"] = safe_next(next)
     return await oauth.google.authorize_redirect(
         request,
         settings.GOOGLE_REDIRECT_URI,
@@ -119,7 +136,8 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         return fail("domain")
 
     member = provision_member(db, email, info.get("given_name"), info.get("family_name"))
-    response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+    target = safe_next(request.session.pop("next", None)) or "/"
+    response = RedirectResponse(target, status_code=status.HTTP_303_SEE_OTHER)
     _set_auth_cookies(response, member.id)
     return response
 
