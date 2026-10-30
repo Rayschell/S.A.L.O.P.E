@@ -18,3 +18,14 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-elevated); }
 ::-webkit-scrollbar-thumb { background: var(--bg-high); border-radius: 3px; }
+
+/* Survols : seulement avec une souris (au doigt, l'effet resterait collé après le tap).
+   !important car les composants posent leur fond/couleur en inline. */
+@media (hover: hover) {
+  .hover-high:hover { background: var(--bg-high) !important; }
+  .hover-elevated:hover { background: var(--bg-elevated) !important; }
+  .hover-text:hover { color: var(--text-secondary) !important; }
+}
+
+/* Visible uniquement sur téléphone (voir mobile.css) */
+.mobile-only { display: none !important; }

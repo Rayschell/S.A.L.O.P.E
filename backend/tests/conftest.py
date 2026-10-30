@@ -119,3 +119,13 @@ def client(db_session: Session, bureau_member) -> TestClient:
         yield c
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_register_rate_limit():
+    """Le rate-limit DCR est in-memory et par IP : tous les tests partagent l'IP du TestClient."""
+    from app.routers import oauth
+
+    oauth._REGISTER_ATTEMPTS.clear()
+    yield
+    oauth._REGISTER_ATTEMPTS.clear()

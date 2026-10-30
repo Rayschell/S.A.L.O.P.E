@@ -13,9 +13,11 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
 )
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import relationship
 
@@ -115,6 +117,10 @@ class Event(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     inscriptions_deadline = Column(DateTime, nullable=True)
+    # Logo de l'export PNG — NULL = logo LATEB original
+    logo_id = Column(
+        Integer, ForeignKey("logos.id", ondelete="SET NULL"), nullable=True
+    )
 
     slots = relationship(
         "Slot", back_populates="event", cascade="all, delete-orphan"
@@ -288,6 +294,24 @@ class PendingSubmission(Base):
     )
 
 
+class Logo(Base):
+    """Logo importé (ex : spécial Halloween), choisissable par événement pour l'export PNG.
+
+    `contenu` est toujours un PNG RGBA normalisé (bords transparents rognés).
+    """
+
+    __tablename__ = "logos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String, nullable=False)
+    contenu = Column(LargeBinary, nullable=False)
+    # Thème de l'export dérivé des couleurs du logo (sinon thème LATEB)
+    utiliser_couleurs = Column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+
 class Saison(Base):
     """Mandat de bureau (~avril → avril) servant de fenêtre de filtrage des stats."""
 
@@ -327,3 +351,63 @@ class StatsMemberHeureRelative(Base):
             name="uq_stats_member_heure",
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# OAuth 2.1 — serveur d'autorisation du MCP (/api/mcp)
+# ---------------------------------------------------------------------------
+
+
+class OAuthClient(Base):
+    """Client MCP enregistré dynamiquement (RFC 7591), toujours public."""
+
+    __tablename__ = "oauth_clients"
+
+    client_id = Column(String, primary_key=True)
+    client_name = Column(String, nullable=True)
+    redirect_uris = Column(ARRAY(String), nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+
+class OAuthAuthorizationCode(Base):
+    """Code d'autorisation PKCE, usage unique, stocké hashé."""
+
+    __tablename__ = "oauth_authorization_codes"
+
+    id = Column(Integer, primary_key=True)
+    code_hash = Column(String, nullable=False, unique=True, index=True)
+    client_id = Column(
+        String, ForeignKey("oauth_clients.client_id", ondelete="CASCADE"), nullable=False
+    )
+    membre_id = Column(
+        Integer, ForeignKey("members.id", ondelete="CASCADE"), nullable=False
+    )
+    redirect_uri = Column(String, nullable=False)
+    code_challenge = Column(String, nullable=False)
+    resource = Column(String, nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+
+
+class OAuthToken(Base):
+    """Access ou refresh token MCP opaque, stocké hashé.
+
+    `family_id` regroupe les tokens issus d'une même autorisation : la
+    réutilisation d'un refresh déjà consommé révoque toute la famille.
+    """
+
+    __tablename__ = "oauth_tokens"
+
+    id = Column(Integer, primary_key=True)
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    type = Column(String, nullable=False)  # "access" | "refresh"
+    client_id = Column(
+        String, ForeignKey("oauth_clients.client_id", ondelete="CASCADE"), nullable=False
+    )
+    membre_id = Column(
+        Integer, ForeignKey("members.id", ondelete="CASCADE"), nullable=False
+    )
+    family_id = Column(String, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())

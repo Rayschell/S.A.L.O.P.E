@@ -29,6 +29,14 @@ spec:
                 name: salope-backend
                 port:
                   number: 8000
+          # Découverte OAuth du serveur MCP (RFC 8414 / RFC 9728) → backend
+          - path: /.well-known
+            pathType: Prefix
+            backend:
+              service:
+                name: salope-backend
+                port:
+                  number: 8000
           # All other requests → frontend (SPA)
           - path: /
             pathType: Prefix

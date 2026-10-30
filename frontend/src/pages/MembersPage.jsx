@@ -230,6 +230,7 @@ export default function MembersPage() {
           {isBureau && (
             <div
               data-keep-selection
+              className={`member-panel${selectedMember ? ' is-open' : ''}`}
               style={{
                 flex: '0 0 400px',
                 minWidth: 320,

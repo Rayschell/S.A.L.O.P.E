@@ -1,7 +1,13 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { IconEye, IconEyeOff, IconGlassFull } from '@tabler/icons-react'
+
+const OIDC_ERRORS = {
+  oidc: 'La connexion Google a échoué. Réessayez.',
+  email: "Votre adresse Google n'est pas vérifiée.",
+  domain: 'Seuls les comptes @lateb.eu sont autorisés.',
+}
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -9,7 +15,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
+  const [searchParams] = useSearchParams()
+  const [error, setError] = useState(OIDC_ERRORS[searchParams.get('error')] || '')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -66,6 +73,30 @@ export default function LoginPage() {
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
           Accès réservé aux membres de l'association
         </p>
+
+        <a
+          href="/api/auth/google/login"
+          style={{
+            display: 'block',
+            textAlign: 'center',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-mid)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '9px 14px',
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+            textDecoration: 'none',
+            marginBottom: 16,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Se connecter avec Google
+        </a>
+
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16 }}>
+          ou
+        </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>

@@ -13,9 +13,11 @@ import ParticipantsFilter from '../components/events/ParticipantsFilter.jsx'
 import PlanningGrid from '../components/planning/PlanningGrid.jsx'
 import WarningsList from '../components/planning/WarningsList.jsx'
 import ProposalCompareModal from '../components/planning/ProposalCompareModal.jsx'
+import LogoPicker from '../components/events/LogoPicker.jsx'
+import { logosApi } from '../api/logos.js'
 import Badge from '../components/ui/Badge.jsx'
 import { toast } from '../components/ui/Toaster.jsx'
-import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload, IconCopy, IconArrowBackUp, IconAlertTriangle, IconLayoutColumns } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload, IconCopy, IconArrowBackUp, IconAlertTriangle, IconLayoutColumns, IconTrash, IconDots, IconX } from '@tabler/icons-react'
 
 const TABS = ['import', 'config', 'respos', 'affinites', 'participants', 'planning']
 const TAB_LABELS = {
@@ -33,6 +35,7 @@ export default function EventDetailPage() {
   const { user } = useAuth()
   const isBureau = user?.roles?.includes('bureau')
 
+  const [showMore, setShowMore] = useState(false) // actions secondaires dépliées (téléphone)
   const [event, setEvent] = useState(null)
   const [slots, setSlots] = useState([])
   const [members, setMembers] = useState([])
@@ -43,6 +46,8 @@ export default function EventDetailPage() {
   const [excludedMemberIds, setExcludedMemberIds] = useState(new Set())
   const [tab, setTab] = useState('import')
   const [generating, setGenerating] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [showClearModal, setShowClearModal] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [exportingPng, setExportingPng] = useState(false)
   const [copyingPng, setCopyingPng] = useState(false)
@@ -50,6 +55,7 @@ export default function EventDetailPage() {
   const [highlight, setHighlight] = useState(null) // { slotId, memberId }
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [showProposals, setShowProposals] = useState(false)
+  const [showLogoPicker, setShowLogoPicker] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Pile d'annulation : chaque entrée = liste d'opérations inverses identifiées
@@ -147,6 +153,19 @@ export default function EventDetailPage() {
     }
   }
 
+  const handleClearPlanning = async () => {
+    setClearing(true)
+    try {
+      await eventsApi.clearAssignments(id)
+      setAssignments([])
+      clearUndo()
+      setShowClearModal(false)
+      toast.success('Planning vidé')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   const handleApplyProposal = (result) => {
     setAssignments(result.assignments)
     clearUndo()
@@ -210,6 +229,11 @@ export default function EventDetailPage() {
     }
   }
 
+  const handleSelectLogo = async (logoId) => {
+    const ev = await eventsApi.setLogo(id, logoId)
+    setEvent((prev) => ({ ...prev, logo_id: ev.logo_id }))
+  }
+
   const handleCopyPng = async () => {
     setCopyingPng(true)
     try {
@@ -269,7 +293,7 @@ export default function EventDetailPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
+      <div className="event-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
         <div>
           <button
             onClick={() => navigate('/events')}
@@ -301,7 +325,7 @@ export default function EventDetailPage() {
           </p>
         </div>
         {isBureau && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className={`event-actions${showMore ? ' show-more' : ''}`} style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
             <button
               onClick={handleGenerate}
               disabled={generating || isPublished || !canGenerate}
@@ -313,6 +337,7 @@ export default function EventDetailPage() {
             </button>
             <button
               onClick={() => setShowProposals(true)}
+              className="event-secondary"
               disabled={generating || isPublished || !canGenerate}
               title={!canGenerate ? "Importez d'abord les disponibilités (onglet Import CSV)" : 'Générer 3 variantes et choisir la meilleure'}
               style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), opacity: generating || isPublished || !canGenerate ? 0.5 : 1, cursor: generating || isPublished || !canGenerate ? 'not-allowed' : 'pointer' }}
@@ -343,6 +368,7 @@ export default function EventDetailPage() {
             )}
             <button
               onClick={handleExportPng}
+              className="event-secondary"
               disabled={exportingPng}
               style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), opacity: exportingPng ? 0.5 : 1, cursor: exportingPng ? 'not-allowed' : 'pointer' }}
             >
@@ -352,6 +378,7 @@ export default function EventDetailPage() {
             {typeof ClipboardItem !== 'undefined' && (
               <button
                 onClick={handleCopyPng}
+                className="event-secondary"
                 disabled={copyingPng}
                 title="Copier l'image dans le presse-papier"
                 style={{ ...actionBtnStyle('var(--bg-high)', pngCopied ? 'var(--green)' : 'var(--text-secondary)', '1px solid var(--border)'), opacity: copyingPng ? 0.5 : 1, cursor: copyingPng ? 'not-allowed' : 'pointer' }}
@@ -360,6 +387,27 @@ export default function EventDetailPage() {
                 {pngCopied ? 'Copié !' : copyingPng ? 'Copie…' : 'Copier'}
               </button>
             )}
+            <button
+              onClick={() => setShowLogoPicker(true)}
+              className="event-secondary"
+              title="Choisir le logo de l'export PNG"
+              style={actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)')}
+            >
+              <img
+                src={logosApi.imageUrl(event.logo_id)}
+                alt=""
+                style={{ height: 16, width: 16, objectFit: 'contain' }}
+              />
+              Logo
+            </button>
+            <button
+              onClick={() => setShowMore((v) => !v)}
+              className="mobile-only"
+              aria-label="Plus d'actions"
+              style={actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)')}
+            >
+              {showMore ? <IconX size={13} stroke={1.5} /> : <IconDots size={13} stroke={1.5} />}
+            </button>
           </div>
         )}
       </div>
@@ -496,6 +544,8 @@ export default function EventDetailPage() {
             onUndoableAction={pushUndo}
             canUndo={undoCount > 0}
             onUndo={handleUndo}
+            canClear={assignments.length > 0 && !generating}
+            onClear={() => setShowClearModal(true)}
             eventId={id}
             disabled={!isBureau || isPublished}
           />
@@ -512,6 +562,47 @@ export default function EventDetailPage() {
           onApply={handleApplyProposal}
           onClose={() => setShowProposals(false)}
         />
+      )}
+
+      {showLogoPicker && (
+        <LogoPicker
+          currentLogoId={event.logo_id ?? null}
+          onSelect={handleSelectLogo}
+          onClose={() => setShowLogoPicker(false)}
+        />
+      )}
+
+      {/* Clear planning confirmation modal */}
+      {showClearModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-mid)', borderRadius: 'var(--radius-lg)', padding: 24, width: '100%', maxWidth: 460, margin: '0 16px' }}>
+            <h2 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 14 }}>
+              Vider le planning ?
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              <span>{assignments.length} affectation{assignments.length > 1 ? 's' : ''} {assignments.length > 1 ? 'seront supprimées' : 'sera supprimée'}, automatiques et manuelles.</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                Cette action ne peut pas être annulée. Les disponibilités, créneaux et respos ne sont pas touchés.
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowClearModal(false)}
+                style={actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)')}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleClearPlanning}
+                disabled={clearing}
+                style={{ ...actionBtnStyle('var(--red)'), opacity: clearing ? 0.5 : 1 }}
+              >
+                <IconTrash size={13} stroke={1.5} />
+                {clearing ? 'Vidage…' : 'Vider'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Publish confirmation modal */}

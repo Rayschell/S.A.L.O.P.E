@@ -1,0 +1,68 @@
+/* Adaptations téléphone (< 768 px). Les composants stylent en inline :
+   les surcharges ci-dessous ont donc besoin de !important. */
+@media (max-width: 767px) {
+  /* iOS zoome sur un champ dont la police fait moins de 16 px */
+  input, select, textarea { font-size: 16px !important; }
+
+  .tap-target { width: 40px !important; height: 40px !important; }
+
+  /* Formulaire public /dispo : heure au-dessus, 3 boutons pleine largeur */
+  .poll-card { padding: 20px 14px !important; }
+  .poll-slot { flex-wrap: wrap; }
+  .poll-choices {
+    margin-left: 0 !important;
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px !important;
+  }
+  .poll-choices button {
+    justify-content: center;
+    padding: 10px 4px !important;
+    font-size: 13px !important;
+  }
+  .poll-setall button { padding: 8px 10px !important; }
+
+  /* En-tête d'un événement : titre puis actions en dessous */
+  .event-header { flex-direction: column; }
+  .event-actions { flex-shrink: 1 !important; }
+  .mobile-only { display: inline-flex !important; }
+  .event-actions:not(.show-more) .event-secondary { display: none !important; }
+
+  /* Grille de planning resserrée (la colonne des noms est déjà sticky) */
+  .planning-table:not(.mini-planning):not(.member-table) { font-size: 13px; }
+  .planning-table:not(.mini-planning):not(.member-table) thead th { padding: 10px 8px; font-size: 12px; }
+  .planning-table:not(.mini-planning):not(.member-table) thead th div { font-size: 12px !important; }
+  .planning-table:not(.mini-planning):not(.member-table) thead th:first-child,
+  .planning-table:not(.mini-planning):not(.member-table) tbody td:first-child,
+  .planning-table:not(.mini-planning):not(.member-table) tfoot td:first-child {
+    min-width: 0;
+    max-width: 110px;
+    padding-left: 8px;
+    font-size: 13px;
+    white-space: normal;
+  }
+  .planning-table:not(.mini-planning):not(.member-table) tbody td { padding: 12px 6px; min-width: 52px; }
+  .planning-table:not(.mini-planning):not(.member-table) .cell-staff,
+  .planning-table:not(.mini-planning):not(.member-table) .cell-respo { font-size: 12px; }
+  .planning-table:not(.mini-planning):not(.member-table) tfoot td { padding: 12px 6px; font-size: 13px; }
+  .planning-table .col-hours { font-size: 12px; }
+
+  /* Comparaison de variantes : une variante sous l'autre */
+  .proposal-grid { grid-template-columns: 1fr !important; }
+
+  /* Page Membres : panneau pleine largeur, stats d'un membre en plein écran */
+  .member-panel {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+    position: static !important;
+    max-height: none !important;
+  }
+  .member-panel.is-open {
+    position: fixed !important;
+    inset: 48px 0 0 0 !important;
+    z-index: 55;
+    border-radius: 0 !important;
+    overflow-y: auto;
+  }
+}

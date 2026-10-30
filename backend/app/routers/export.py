@@ -9,6 +9,7 @@ from ..core.deps import get_current_member, get_db
 from ..models.models import Assignment, Member, Slot
 from ..routers.events import _get_event_or_404
 from ..services.export_img import export_planning_png
+from ..services.logo_theme import logo_et_theme
 
 router = APIRouter(prefix="/api/events", tags=["export"])
 
@@ -34,7 +35,10 @@ def export_png(
     members = db.query(Member).filter(Member.id.in_(member_ids)).all()
     members.sort(key=lambda m: (m.nom, m.prenom))
 
-    png_bytes = export_planning_png(event, slots, members, assignments)
+    logo_png, theme = logo_et_theme(db, event)
+    png_bytes = export_planning_png(
+        event, slots, members, assignments, logo_png=logo_png, theme=theme
+    )
     return Response(
         content=png_bytes,
         media_type="image/png",

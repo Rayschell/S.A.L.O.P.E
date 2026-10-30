@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { IconAlertTriangle, IconAlertCircle, IconInfoCircle, IconWand } from '@tabler/icons-react'
 import { eventsApi } from '../../api/events.js'
+import { popupPos } from '../../utils/popupPos.js'
 
 const WARNING_LABELS = {
   no_respo_bar: 'Respo bar manquant',
@@ -133,7 +134,7 @@ export default function WarningsList({
   const openFix = (e, groups) => {
     e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
-    setPopover({ groups, x: rect.left, y: rect.bottom + 6 })
+    setPopover({ groups, ...popupPos(rect, 240, 280) })
   }
 
   const runFix = async (item) => {
@@ -166,9 +167,12 @@ export default function WarningsList({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+      {/* Replié par défaut sur téléphone pour ne pas repousser la grille */}
+      <details open={!window.matchMedia('(max-width: 767px)').matches}>
+      <summary style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer', marginBottom: 8 }}>
         {warnings.length} avertissement(s) après génération
-      </p>
+      </summary>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {Object.entries(grouped).map(([type, items]) => {
         const { bg, border, color, Icon } = WARNING_STYLE[type] || DEFAULT_STYLE
         return (
@@ -229,6 +233,8 @@ export default function WarningsList({
           </div>
         )
       })}
+      </div>
+      </details>
 
       {/* Popover de correction */}
       {popover && (
@@ -262,8 +268,7 @@ export default function WarningsList({
                     border: 'none', borderRadius: 4, cursor: 'pointer',
                     fontFamily: "'DM Sans', sans-serif",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-high)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  className="hover-high"
                 >
                   {item.member.prenom} {item.member.nom}
                   <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>

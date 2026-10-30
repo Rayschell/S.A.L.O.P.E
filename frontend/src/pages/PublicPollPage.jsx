@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { publicApi } from '../api/publicClient.js'
-import { IconGlassFull, IconCheck, IconQuestionMark, IconX } from '@tabler/icons-react'
+import { IconCheck, IconQuestionMark, IconX } from '@tabler/icons-react'
 
 const STATUTS = [
   { value: 'yes', label: 'Dispo', icon: IconCheck, color: 'var(--green)', soft: 'var(--green-soft)' },
   { value: 'maybe', label: 'Peut-être', icon: IconQuestionMark, color: 'var(--amber)', soft: 'var(--amber-soft)' },
-  { value: 'no', label: 'Pas dispo', icon: IconX, color: 'var(--text-muted)', soft: 'var(--bg-high)' },
+  { value: 'no', label: 'Pas dispo', icon: IconX, color: 'var(--red)', soft: 'var(--red-soft)' },
 ]
+
+const NOM_KEY = 'salope_dispo_nom'
 
 const CLOSED_MESSAGES = {
   closed: 'Les inscriptions sont fermées pour cet événement.',
@@ -24,7 +26,10 @@ export default function PublicPollPage() {
   const [poll, setPoll] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [nom, setNom] = useState('')
+  // Nom mémorisé sur l'appareil pour ne pas le retaper au prochain lien
+  const [nom, setNom] = useState(() => {
+    try { return localStorage.getItem(NOM_KEY) || '' } catch { return '' }
+  })
   const [reponses, setReponses] = useState({}) // {creneau_id: 'yes'|'maybe'|'no'}
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -33,10 +38,7 @@ export default function PublicPollPage() {
   useEffect(() => {
     publicApi
       .getPoll(token)
-      .then((data) => {
-        setPoll(data)
-        setReponses(Object.fromEntries(data.slots.map((s) => [s.id, 'no'])))
-      })
+      .then(setPoll)
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
   }, [token])
@@ -51,17 +53,25 @@ export default function PublicPollPage() {
   const fmtHour = (iso) =>
     new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
+  const setAll = (statut) =>
+    setReponses(Object.fromEntries(poll.slots.map((s) => [s.id, statut])))
+
+  // Aucune réponse présélectionnée : chaque créneau doit être renseigné
+  const nbSansReponse = poll ? poll.slots.filter((s) => !reponses[s.id]).length : 0
+  const cannotSubmit = !poll?.ouvert || !nom.trim() || nbSansReponse > 0 || busy
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!nom.trim() || busy) return
+    if (cannotSubmit) return
     setBusy(true)
     setError('')
     try {
       const payload = {
         nom: nom.trim(),
-        reponses: poll.slots.map((s) => ({ creneau_id: s.id, statut: reponses[s.id] || 'no' })),
+        reponses: poll.slots.map((s) => ({ creneau_id: s.id, statut: reponses[s.id] })),
       }
       const res = await publicApi.submit(token, payload)
+      try { localStorage.setItem(NOM_KEY, payload.nom) } catch { /* stockage indisponible */ }
       setResult(res.status)
     } catch (err) {
       const status = err.response?.status
@@ -79,9 +89,7 @@ export default function PublicPollPage() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', justifyContent: 'center', padding: '32px 16px' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconGlassFull size={14} color="#fff" stroke={1.8} />
-          </div>
+          <img src="/lateb_logo.svg" alt="LATEB" style={{ width: 42, height: 42, flexShrink: 0 }} />
           <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>S.A.L.O.P.E</span>
         </div>
         {children}
@@ -95,7 +103,7 @@ export default function PublicPollPage() {
 
   if (notFound) {
     return page(
-      <div style={cardStyle}>
+      <div className="poll-card" style={cardStyle}>
         <h1 style={titleStyle}>Sondage introuvable</h1>
         <p style={mutedStyle}>Ce lien d'inscription n'existe pas ou a été désactivé.</p>
       </div>
@@ -124,7 +132,7 @@ export default function PublicPollPage() {
   }
 
   return page(
-    <div style={cardStyle}>
+    <div className="poll-card" style={cardStyle}>
       <h1 style={titleStyle}>{poll.event_nom}</h1>
       <p style={{ ...mutedStyle, marginBottom: 18, textTransform: 'capitalize' }}>{eventDate}</p>
 
@@ -148,11 +156,37 @@ export default function PublicPollPage() {
         </div>
 
         <div>
-          <label style={labelStyle}>Mes disponibilités</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>Mes disponibilités</label>
+            <div className="poll-setall" style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+              {[
+                { value: 'yes', label: 'Dispo partout' },
+                { value: 'no', label: 'Pas dispo partout' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={!poll.ouvert}
+                  onClick={() => setAll(value)}
+                  style={{
+                    padding: '4px 8px', fontSize: 11.5, borderRadius: 'var(--radius-sm)',
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: poll.ouvert ? 'pointer' : 'not-allowed',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {poll.slots.map((slot) => (
               <div
                 key={slot.id}
+                className="poll-slot"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   background: 'var(--bg-elevated)', border: '1px solid var(--border)',
@@ -162,9 +196,9 @@ export default function PublicPollPage() {
                 <span style={{ fontSize: 13, fontFamily: 'DM Mono, monospace', color: 'var(--text-primary)', minWidth: 96 }}>
                   {fmtHour(slot.heure_debut)} – {fmtHour(slot.heure_fin)}
                 </span>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                <div className="poll-choices" style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
                   {STATUTS.map(({ value, label, icon: Icon, color, soft }) => {
-                    const active = (reponses[slot.id] || 'no') === value
+                    const active = reponses[slot.id] === value
                     return (
                       <button
                         key={value}
@@ -200,17 +234,32 @@ export default function PublicPollPage() {
           </div>
         )}
 
+        {/* Barre d'envoi collée en bas de l'écran : pas besoin de défiler jusqu'au bout */}
+        <div style={{
+          position: 'sticky', bottom: 0, padding: '10px 0',
+          background: 'var(--bg-surface)', borderTop: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', gap: 6,
+        }}>
+        {poll.ouvert && nbSansReponse > 0 && (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            {nbSansReponse === poll.slots.length
+              ? 'Indique ta disponibilité pour chaque créneau.'
+              : `Encore ${nbSansReponse} créneau${nbSansReponse > 1 ? 'x' : ''} sans réponse.`}
+          </p>
+        )}
+
         <button
           type="submit"
-          disabled={!poll.ouvert || !nom.trim() || busy}
+          disabled={cannotSubmit}
           style={{
             ...primaryBtnStyle,
-            cursor: !poll.ouvert || !nom.trim() || busy ? 'not-allowed' : 'pointer',
-            opacity: !poll.ouvert || !nom.trim() || busy ? 0.55 : 1,
+            cursor: cannotSubmit ? 'not-allowed' : 'pointer',
+            opacity: cannotSubmit ? 0.55 : 1,
           }}
         >
           {busy ? 'Envoi…' : 'Envoyer mes disponibilités'}
         </button>
+        </div>
         <p style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center', marginTop: -6 }}>
           Déjà répondu ? Re-soumettre avec le même nom remplace tes réponses.
         </p>

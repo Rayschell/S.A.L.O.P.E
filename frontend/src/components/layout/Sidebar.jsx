@@ -30,6 +30,7 @@ export default function Sidebar() {
         flexDirection: 'column',
         gap: 2,
         overflowY: 'auto',
+        flex: 1,
       }}
     >
       {SECTIONS.map((section) => (
@@ -95,8 +96,7 @@ export default function Sidebar() {
           width: '100%',
           fontFamily: "'DM Sans', sans-serif",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)' }}
+        className="hover-text"
       >
         <IconLogout size={16} stroke={1.5} />
         Déconnexion

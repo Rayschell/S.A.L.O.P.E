@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import time
+from typing import Optional
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -17,6 +19,7 @@ from ..core.security import (
 )
 from ..models.models import Member
 from ..schemas.schemas import LoginRequest, MemberRead
+from ..services.google_auth import email_allowed, oauth, provision_member
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -86,6 +89,57 @@ def login(
 
     _set_auth_cookies(response, member.id)
     return member
+
+
+_NEXT_ALLOWED = "/api/oauth/authorize"
+
+
+def safe_next(value: Optional[str]) -> Optional[str]:
+    """`next` post-login : uniquement l'authorize OAuth du MCP (anti open-redirect)."""
+    if not value or "\\" in value:
+        return None
+    if value == _NEXT_ALLOWED or value.startswith(_NEXT_ALLOWED + "?"):
+        return value
+    return None
+
+
+@router.get("/google/login")
+async def google_login(request: Request, next: Optional[str] = None):
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Google login not configured")
+    # Retour vers l'authorize OAuth du MCP après le login, si demandé
+    request.session.pop("next", None)
+    if safe_next(next):
+        request.session["next"] = safe_next(next)
+    return await oauth.google.authorize_redirect(
+        request,
+        settings.GOOGLE_REDIRECT_URI,
+        hd=settings.ALLOWED_EMAIL_DOMAIN,  # simple indice UX, le contrôle réel est fait au callback
+    )
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    def fail(code: str) -> RedirectResponse:
+        return RedirectResponse(f"/login?error={code}", status_code=status.HTTP_303_SEE_OTHER)
+
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except Exception:
+        return fail("oidc")
+
+    info = token.get("userinfo") or {}
+    email = (info.get("email") or "").lower()
+    if not email or not info.get("email_verified"):
+        return fail("email")
+    if not email_allowed(email) or info.get("hd", "").lower() != settings.ALLOWED_EMAIL_DOMAIN.lower():
+        return fail("domain")
+
+    member = provision_member(db, email, info.get("given_name"), info.get("family_name"))
+    target = safe_next(request.session.pop("next", None)) or "/"
+    response = RedirectResponse(target, status_code=status.HTTP_303_SEE_OTHER)
+    _set_auth_cookies(response, member.id)
+    return response
 
 
 @router.post("/refresh", response_model=MemberRead)

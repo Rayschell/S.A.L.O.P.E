@@ -9,6 +9,8 @@ export const eventsApi = {
   delete: (id) => client.delete(`/events/${id}`),
   publish: (id) => client.post(`/events/${id}/publish`).then((r) => r.data),
   unpublish: (id) => client.post(`/events/${id}/unpublish`).then((r) => r.data),
+  setLogo: (id, logoId) =>
+    client.put(`/events/${id}/logo`, { logo_id: logoId }).then((r) => r.data),
   setExclusions: (id, memberIds) =>
     client.put(`/events/${id}/exclusions`, { member_ids: memberIds }).then((r) => r.data),
 
@@ -63,6 +65,7 @@ export const eventsApi = {
     client.put(`/events/${eventId}/assignments/${asgId}`, payload).then((r) => r.data),
   deleteAssignment: (eventId, asgId) =>
     client.delete(`/events/${eventId}/assignments/${asgId}`),
+  clearAssignments: (id) => client.delete(`/events/${id}/assignments`),
 
   // Availabilities
   listAvailabilities: (id) => client.get(`/events/${id}/availabilities`).then((r) => r.data),

@@ -132,7 +132,7 @@ export default function ProposalCompareModal({ eventId, slots, members, excluded
             </p>
           )}
           {!loading && proposals.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${proposals.length}, 1fr)`, gap: 14 }}>
+            <div className="proposal-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${proposals.length}, 1fr)`, gap: 14 }}>
               {proposals.map((p, pi) => (
                 <div
                   key={p.index}
