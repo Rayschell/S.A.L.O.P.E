@@ -3,6 +3,7 @@ import { IconPlus, IconUserPlus, IconArrowBackUp, IconTrash } from '@tabler/icon
 import { eventsApi } from '../../api/events.js'
 import PlanningLegend from './PlanningLegend.jsx'
 import '../../styles/planning.css'
+import { popupPos } from '../../utils/popupPos.js'
 
 export default function PlanningGrid({
   event,
@@ -155,7 +156,7 @@ export default function PlanningGrid({
     if (!asgMap[key] && availMap[key] === 'no') {
       const rect = e.currentTarget.getBoundingClientRect()
       setEditCell(null)
-      setCellError({ memberId, slotId, x: rect.left, y: rect.bottom + 6, message: 'Ce membre est indisponible sur ce créneau' })
+      setCellError({ memberId, slotId, ...popupPos(rect, 280, 32), message: 'Ce membre est indisponible sur ce créneau' })
       return
     }
     if (editCell?.memberId === memberId && editCell?.slotId === slotId) {
@@ -163,7 +164,7 @@ export default function PlanningGrid({
       return
     }
     const rect = e.currentTarget.getBoundingClientRect()
-    setEditCell({ memberId, slotId, x: rect.left, y: rect.bottom + 6 })
+    setEditCell({ memberId, slotId, ...popupPos(rect, 140, 170) })
   }
 
   const handleAssign = async (memberId, slotId, type) => {
@@ -266,8 +267,7 @@ export default function PlanningGrid({
                 border: 'none', borderRadius: 4, cursor: 'pointer',
                 fontFamily: "'DM Sans', sans-serif",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-high)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              className="hover-high"
             >
               <IconPlus size={12} stroke={1.5} color="var(--text-muted)" />
               {m.prenom} {m.nom}

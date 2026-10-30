@@ -91,8 +91,7 @@ export default function TeamOverview({ members, onSelect }) {
                   fontFamily: "'DM Sans', sans-serif",
                   transition: 'background 120ms ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                className="hover-elevated"
               >
                 <span style={{ flexShrink: 0, fontSize: 13, color: 'var(--text-primary)', width: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.prenom} {m.nom}

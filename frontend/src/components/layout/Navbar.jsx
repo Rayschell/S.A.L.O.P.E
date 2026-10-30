@@ -22,6 +22,7 @@ export default function Navbar({ onToggleSidebar }) {
       {/* Logo + toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
+          className="tap-target hover-high"
           onClick={onToggleSidebar}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -31,8 +32,6 @@ export default function Navbar({ onToggleSidebar }) {
             transition: 'background 120ms ease',
           }}
           title="Masquer / afficher la barre latérale"
-          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-high)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
         >
           <IconMenu2 size={15} stroke={1.5} />
         </button>
@@ -51,6 +50,7 @@ export default function Navbar({ onToggleSidebar }) {
       {/* Avatar + theme toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
+          className="tap-target hover-high"
           onClick={toggleTheme}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -60,8 +60,6 @@ export default function Navbar({ onToggleSidebar }) {
             transition: 'background 120ms ease',
           }}
           title={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-high)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
         >
           {theme === 'dark' ? <IconSun size={16} stroke={1.5} /> : <IconMoon size={16} stroke={1.5} />}
         </button>

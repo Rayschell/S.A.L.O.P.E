@@ -17,7 +17,7 @@ import LogoPicker from '../components/events/LogoPicker.jsx'
 import { logosApi } from '../api/logos.js'
 import Badge from '../components/ui/Badge.jsx'
 import { toast } from '../components/ui/Toaster.jsx'
-import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload, IconCopy, IconArrowBackUp, IconAlertTriangle, IconLayoutColumns, IconTrash } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlayerPlay, IconCheck, IconDownload, IconCopy, IconArrowBackUp, IconAlertTriangle, IconLayoutColumns, IconTrash, IconDots, IconX } from '@tabler/icons-react'
 
 const TABS = ['import', 'config', 'respos', 'affinites', 'participants', 'planning']
 const TAB_LABELS = {
@@ -35,6 +35,7 @@ export default function EventDetailPage() {
   const { user } = useAuth()
   const isBureau = user?.roles?.includes('bureau')
 
+  const [showMore, setShowMore] = useState(false) // actions secondaires dépliées (téléphone)
   const [event, setEvent] = useState(null)
   const [slots, setSlots] = useState([])
   const [members, setMembers] = useState([])
@@ -292,7 +293,7 @@ export default function EventDetailPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
+      <div className="event-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
         <div>
           <button
             onClick={() => navigate('/events')}
@@ -324,7 +325,7 @@ export default function EventDetailPage() {
           </p>
         </div>
         {isBureau && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className={`event-actions${showMore ? ' show-more' : ''}`} style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
             <button
               onClick={handleGenerate}
               disabled={generating || isPublished || !canGenerate}
@@ -336,6 +337,7 @@ export default function EventDetailPage() {
             </button>
             <button
               onClick={() => setShowProposals(true)}
+              className="event-secondary"
               disabled={generating || isPublished || !canGenerate}
               title={!canGenerate ? "Importez d'abord les disponibilités (onglet Import CSV)" : 'Générer 3 variantes et choisir la meilleure'}
               style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), opacity: generating || isPublished || !canGenerate ? 0.5 : 1, cursor: generating || isPublished || !canGenerate ? 'not-allowed' : 'pointer' }}
@@ -366,6 +368,7 @@ export default function EventDetailPage() {
             )}
             <button
               onClick={handleExportPng}
+              className="event-secondary"
               disabled={exportingPng}
               style={{ ...actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)'), opacity: exportingPng ? 0.5 : 1, cursor: exportingPng ? 'not-allowed' : 'pointer' }}
             >
@@ -375,6 +378,7 @@ export default function EventDetailPage() {
             {typeof ClipboardItem !== 'undefined' && (
               <button
                 onClick={handleCopyPng}
+                className="event-secondary"
                 disabled={copyingPng}
                 title="Copier l'image dans le presse-papier"
                 style={{ ...actionBtnStyle('var(--bg-high)', pngCopied ? 'var(--green)' : 'var(--text-secondary)', '1px solid var(--border)'), opacity: copyingPng ? 0.5 : 1, cursor: copyingPng ? 'not-allowed' : 'pointer' }}
@@ -385,6 +389,7 @@ export default function EventDetailPage() {
             )}
             <button
               onClick={() => setShowLogoPicker(true)}
+              className="event-secondary"
               title="Choisir le logo de l'export PNG"
               style={actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)')}
             >
@@ -394,6 +399,14 @@ export default function EventDetailPage() {
                 style={{ height: 16, width: 16, objectFit: 'contain' }}
               />
               Logo
+            </button>
+            <button
+              onClick={() => setShowMore((v) => !v)}
+              className="mobile-only"
+              aria-label="Plus d'actions"
+              style={actionBtnStyle('var(--bg-high)', 'var(--text-secondary)', '1px solid var(--border)')}
+            >
+              {showMore ? <IconX size={13} stroke={1.5} /> : <IconDots size={13} stroke={1.5} />}
             </button>
           </div>
         )}

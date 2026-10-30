@@ -215,8 +215,7 @@ export default function MemberTable({ members, isBureau, onEdit, onDelete, onRes
                 key={role.id}
                 onMouseDown={() => toggleRole(roleMember, role.id)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1, borderRadius: 4 }}
-                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--bg-high)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                className={disabled ? undefined : "hover-high"}
               >
                 <span style={{ width: 12, height: 12, borderRadius: '50%', background: role.color, flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>{role.label}</span>
@@ -235,16 +234,14 @@ export default function MemberTable({ members, isBureau, onEdit, onDelete, onRes
           <button
             onMouseDown={() => { setMenuId(null); onEdit(menuMember) }}
             style={menuItemStyle}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-high)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            className="hover-high"
           >
             <IconPencil size={13} stroke={1.5} /> Modifier
           </button>
           <button
             onMouseDown={() => { setMenuId(null); onResetCounters(menuMember.id) }}
             style={menuItemStyle}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-high)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            className="hover-high"
           >
             <IconRefresh size={13} stroke={1.5} /> Réinit. compteurs
           </button>
@@ -252,8 +249,7 @@ export default function MemberTable({ members, isBureau, onEdit, onDelete, onRes
           <button
             onMouseDown={() => { setMenuId(null); onDelete(menuMember.id) }}
             style={{ ...menuItemStyle, color: 'var(--red)' }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-high)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            className="hover-high"
           >
             <IconTrash size={13} stroke={1.5} /> Supprimer
           </button>

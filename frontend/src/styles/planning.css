@@ -49,7 +49,9 @@
 }
 .planning-table tbody td:last-child { border-right: none; }
 .planning-table tbody tr:last-child td { border-bottom: none; }
-.planning-table tbody tr:hover td { background: var(--bg-elevated); }
+@media (hover: hover) {
+  .planning-table tbody tr:hover td { background: var(--bg-elevated); }
+}
 
 .cell-staff {
   background: rgba(52, 199, 123, 0.24) !important;
